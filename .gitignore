@@ -1,0 +1,18 @@
+# Dependencies / build output
+node_modules
+dist
+dist-ssr
+*.local
+*.log
+
+# The runtime view store is regenerated at prebuild from the committed viewstore/
+# snapshot (scripts/sync_web_data.mjs). Do not commit the generated copy.
+public/data/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.sw?
+.env*

@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-20 18:13:08",
+  "pub_date": "2026.07.20",
+  "vintages": {
+    "pdl_stall": {
+      "run_date": "2026-07-15",
+      "headline_stall_rate_pct": 9.67,
+      "oews_calibrated_employment": 2845440,
+      "excluded_occupations": "Managers (SOC 11) and classroom teachers (SOC 251/252) excluded from the stall crosstab to match the ACS strandedness universe; the headline rate above is over the full workforce.",
+      "source": "2026.03.31_stall_crosstab.csv"
+    },
+    "acs": {
+      "source": "dashboard_cross_tabulations.csv",
+      "stranded_rate_pct": null
+    },
+    "ai_exposure": {
+      "model_version": "abbe-v2.0",
+      "computed": "2026-03-04T02:16:45Z",
+      "adoption_preset": "baseline",
+      "scenario_id": "default",
+      "horizon": "5y",
+      "scored": 505,
+      "note": "abbe-v2.0 is NOT the model version behind the published report's AI figures. Check the impact_pct distribution against the dashboard's risk bands before publishing."
+    }
+  },
+  "geographies": [
+    {
+      "key": "All",
+      "level": "State"
+    },
+    {
+      "key": "Nashville",
+      "level": "MSA"
+    },
+    {
+      "key": "Memphis",
+      "level": "MSA"
+    },
+    {
+      "key": "Knoxville",
+      "level": "MSA"
+    },
+    {
+      "key": "Chattanooga",
+      "level": "MSA"
+    },
+    {
+      "key": "Other MSA",
+      "level": "MSA"
+    },
+    {
+      "key": "East",
+      "level": "Region"
+    },
+    {
+      "key": "Middle",
+      "level": "Region"
+    },
+    {
+      "key": "West",
+      "level": "Region"
+    }
+  ],
+  "sectors": [
+    "Accommodation and Food Services",
+    "Administrative and Support and Waste Management",
+    "Agriculture, Forestry, Fishing and Hunting",
+    "Arts, Entertainment, and Recreation",
+    "Construction",
+    "Educational Services",
+    "Finance and Insurance",
+    "Health Care and Social Assistance",
+    "Information",
+    "Manufacturing",
+    "Mining, Quarrying, and Oil and Gas Extraction",
+    "Other Services (except Public Administration)",
+    "Professional, Scientific, and Technical Services",
+    "Public Administration",
+    "Real Estate and Rental and Leasing",
+    "Retail Trade",
+    "Transportation and Warehousing",
+    "Utilities",
+    "Wholesale Trade"
+  ],
+  "cohorts": [
+    "Low Wage",
+    "Underemployed",
+    "Stalled",
+    "All Stranded"
+  ],
+  "thresholds": {
+    "low_wage": 30493,
+    "underemployed_ceiling": 45739,
+    "min_stall_duration_sample": 10
+  }
+}

@@ -1,0 +1,233 @@
+{
+  "Accountants and Auditors": [
+    {
+      "profession": "Certified Public Accountant",
+      "regulation": "License",
+      "degree": "Bachelor's Degree"
+    }
+  ],
+  "Mechanical Engineers": [
+    {
+      "profession": "Professional Engineer",
+      "regulation": "License",
+      "degree": "Bachelor's Degree"
+    }
+  ],
+  "Electrical and Electronics Engineers": [
+    {
+      "profession": "Professional Engineer",
+      "regulation": "License",
+      "degree": "Bachelor's Degree"
+    }
+  ],
+  "Civil Engineers": [
+    {
+      "profession": "Professional Engineer",
+      "regulation": "License",
+      "degree": "Bachelor's Degree"
+    }
+  ],
+  "Nurse Anesthetists": [
+    {
+      "profession": "Nurse Anesthetist",
+      "regulation": "License",
+      "degree": "Master's Degree"
+    }
+  ],
+  "Veterinarians": [
+    {
+      "profession": "Veterinarian",
+      "regulation": "License",
+      "degree": "Doctorate Degree"
+    }
+  ],
+  "Veterinary Technologists And Technicians": [
+    {
+      "profession": "Veterinarian Technician",
+      "regulation": "License",
+      "degree": "Associate's Degree"
+    }
+  ],
+  "Hairdressers, Hairstylists, and Cosmetologists": [
+    {
+      "profession": "Cosmetologist",
+      "regulation": "License",
+      "degree": "10th Grade"
+    }
+  ],
+  "Architects, Except Landscape And Naval": [
+    {
+      "profession": "Architect",
+      "regulation": "License",
+      "degree": "Bachelor's Degree"
+    }
+  ],
+  "Construction and Building Inspectors": [
+    {
+      "profession": "Home Inspector",
+      "regulation": "License",
+      "degree": "High School Diploma"
+    }
+  ],
+  "First-Line Supervisors of Police and Detectives": [
+    {
+      "profession": "Police Officer",
+      "regulation": "License",
+      "degree": "High School Diploma"
+    }
+  ],
+  "Physician Assistants": [
+    {
+      "profession": "Physician Assistant",
+      "regulation": "License",
+      "degree": "Master's Degree"
+    }
+  ],
+  "Registered Nurses": [
+    {
+      "profession": "Registered Nurse",
+      "regulation": "License",
+      "degree": "Associate's Degree"
+    }
+  ],
+  "Pharmacists": [
+    {
+      "profession": "Pharmacist",
+      "regulation": "License",
+      "degree": "Doctorate Degree"
+    }
+  ],
+  "Respiratory Therapists": [
+    {
+      "profession": "Respiratory Therapist",
+      "regulation": "License",
+      "degree": "Associate's Degree"
+    }
+  ],
+  "Detectives and Criminal Investigators": [
+    {
+      "profession": "Private Investigator",
+      "regulation": "License",
+      "degree": "None"
+    }
+  ],
+  "Sales and Related Workers, All Other": [
+    {
+      "profession": "Auctioneer",
+      "regulation": "License",
+      "degree": "Certification"
+    }
+  ],
+  "Dental Hygienists": [
+    {
+      "profession": "Dental Hygienist",
+      "regulation": "License",
+      "degree": "Associate's Degree"
+    }
+  ],
+  "Dental Assistants": [
+    {
+      "profession": "Dental Assistant",
+      "regulation": "License",
+      "degree": "Certification"
+    }
+  ],
+  "Surgical Technologists": [
+    {
+      "profession": "Surgical Assistant",
+      "regulation": "Certification",
+      "degree": "Certification"
+    }
+  ],
+  "Physical Therapist Assistants and Aides": [
+    {
+      "profession": "Physical Therapist Assistant",
+      "regulation": "License",
+      "degree": "Associate's Degree"
+    }
+  ],
+  "Physical Therapists": [
+    {
+      "profession": "Physical Therapist",
+      "regulation": "License",
+      "degree": "Doctorate Degree"
+    }
+  ],
+  "Licensed Practical and Licensed Vocational Nurses": [
+    {
+      "profession": "Licensed Practical Nurse",
+      "regulation": "License",
+      "degree": "Certification"
+    }
+  ],
+  "Occupational Therapists": [
+    {
+      "profession": "Occupational Therapist",
+      "regulation": "License",
+      "degree": "Master's Degree"
+    }
+  ],
+  "Manicurists and Pedicurists": [
+    {
+      "profession": "Nail Technician",
+      "regulation": "License",
+      "degree": "10th Grade"
+    }
+  ],
+  "Medical Assistants": [
+    {
+      "profession": "Surgical Assistant",
+      "regulation": "Certification",
+      "degree": "Certification"
+    }
+  ],
+  "Radiologic Technologists And Technicians": [
+    {
+      "profession": "Radiologic Technologist",
+      "regulation": "License",
+      "degree": "Associate's Degree"
+    }
+  ],
+  "Opticians, Dispensing": [
+    {
+      "profession": "Optician",
+      "regulation": "License",
+      "degree": "Associate's Degree"
+    }
+  ],
+  "Nurse Practitioners and Nurse Midwives": [
+    {
+      "profession": "Nurse Practitioner",
+      "regulation": "License",
+      "degree": "Master's Degree"
+    }
+  ],
+  "Pharmacy Technicians": [
+    {
+      "profession": "Pharmacy Technician",
+      "regulation": "Registration",
+      "degree": "None"
+    }
+  ],
+  "Private Detectives and Investigators": [
+    {
+      "profession": "Private Investigator",
+      "regulation": "License",
+      "degree": "None"
+    }
+  ],
+  "Speech-Language Pathologists": [
+    {
+      "profession": "Speech Language Pathologist",
+      "regulation": "License",
+      "degree": "Master's Degree"
+    }
+  ],
+  "Police Officers": [
+    {
+      "profession": "Police Officer",
+      "regulation": "License",
+      "degree": "High School Diploma"
+    }
+  ]
+}
