@@ -42,6 +42,13 @@ type MSACategory = 'Nashville' | 'Memphis' | 'Knoxville' | 'Chattanooga' | 'Othe
  *  and must never be summed with them; "All" is an MSA-only rollup, enforced in R. */
 const REGION_GEOS = new Set(['East', 'Middle', 'West']);
 
+/** Display label for the combined non-major-metro bucket. The data key stays 'Other MSA'
+ *  (matches the pipeline + view store); only the on-screen label changes. Rural counties are
+ *  folded into this bucket to match the PDL stall geography, which has no rural component, so
+ *  an "MSA" label would misleadingly imply rural is excluded. */
+const OTHER_MSA_LABEL = 'Other & Rural TN';
+const geoDisplay = (g: string) => (g === 'Other MSA' ? OTHER_MSA_LABEL : g);
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -564,7 +571,7 @@ const Dashboard = () => {
     const totalStranded = stats.lw + stats.ue + stats.st;
     const strandedPct = stats.total > 0 ? (totalStranded / stats.total) * 100 : 0;
 
-    const geoLabel = geography === 'All' ? 'Tennessee (statewide)' : geography === 'Other MSA' ? 'Other / Rural TN' : REGION_GEOS.has(geography) ? `${geography} Tennessee` : `${geography} MSA`;
+    const geoLabel = geography === 'All' ? 'Tennessee (statewide)' : geography === 'Other MSA' ? OTHER_MSA_LABEL : REGION_GEOS.has(geography) ? `${geography} Tennessee` : `${geography} MSA`;
     const geoContext = REPORT_GEO_CONTEXT[geography] || '';
     const sectorContext = REPORT_SECTOR_CONTEXT[sector] || '';
 
@@ -641,7 +648,7 @@ const Dashboard = () => {
           Across ${esc(geoLabel)}'s ${esc(sector)} sector, <strong>${totalStranded.toLocaleString()} workers</strong> (${strandedPct.toFixed(1)}% of the local sector workforce) meet at least one stranded-talent definition: ${stats.lw.toLocaleString()} low-wage, ${stats.ue.toLocaleString()} underemployed, and ${Math.round(stats.st).toLocaleString()} career-stalled. Of those, roughly <strong>${highRiskShare}% sit in occupations where BGI projects ≥5% employer-demand decline over the next five years</strong> — the report's "double-jeopardy" population, currently stranded and in roles where AI-driven adoption is on track to materially reduce demand for the worker's labour.
         </p>
 
-        ${geoContext ? `<p class="narrative"><strong style="color: #1e3a8a; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em;">${esc(geography === 'All' ? 'Statewide context' : geography + ' context')}</strong><span class="quote">${esc(geoContext)}</span></p>` : ''}
+        ${geoContext ? `<p class="narrative"><strong style="color: #1e3a8a; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em;">${esc(geography === 'All' ? 'Statewide context' : geoDisplay(geography) + ' context')}</strong><span class="quote">${esc(geoContext)}</span></p>` : ''}
         ${sectorContext ? `<p class="narrative"><strong style="color: #1e3a8a; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em;">Sector context</strong><span class="quote">${esc(sectorContext)}</span></p>` : ''}
 
         <div class="footer">Tennessee BGI Strategic Workforce Initiative · ${esc(geoLabel)} · ${esc(sector)} · Page 1 / 3</div>
@@ -1048,7 +1055,7 @@ const Dashboard = () => {
             {cohortBreakdowns.occ.length === 0 ? (
               <div className="text-center py-8 md:py-10">
                 <p className="text-sm font-black text-slate-500 uppercase tracking-widest">No occupation data for this slice</p>
-                <p className="text-xs text-slate-400 mt-2 max-w-md mx-auto">The crosstab does not contain workers for <span className="font-bold text-slate-600">{geography === 'All' ? 'Tennessee' : geography}</span> · <span className="font-bold text-slate-600">{sector}</span>. Pick a different geography or sector to continue.</p>
+                <p className="text-xs text-slate-400 mt-2 max-w-md mx-auto">The crosstab does not contain workers for <span className="font-bold text-slate-600">{geography === 'All' ? 'Tennessee' : geoDisplay(geography)}</span> · <span className="font-bold text-slate-600">{sector}</span>. Pick a different geography or sector to continue.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">

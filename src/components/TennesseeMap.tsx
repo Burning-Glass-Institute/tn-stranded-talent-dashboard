@@ -12,6 +12,11 @@ type GeoOption = MSACategory | GrandDivision;
 
 const GRAND_DIVISIONS: GrandDivision[] = ['East', 'Middle', 'West'];
 
+/** Display label for the combined non-major-metro bucket. Data key stays 'Other MSA' (matches
+ *  the pipeline + view store); rural counties are folded in here, so an "MSA" label would
+ *  misleadingly imply rural is excluded. */
+const geoLabel = (g: string) => (g === 'Other MSA' ? 'Other & Rural TN' : g);
+
 interface TennesseeMapProps {
   selectedRegion: GeoOption | 'All';
   onRegionClick: (region: GeoOption) => void;
@@ -113,7 +118,7 @@ const TennesseeMap: React.FC<TennesseeMapProps> = ({ selectedRegion, onRegionCli
             Selected Geography
           </span>
           <span className="text-lg font-black text-slate-900">
-            {selectedRegion === 'All' ? 'All Tennessee' : selectedRegion}
+            {selectedRegion === 'All' ? 'All Tennessee' : geoLabel(selectedRegion)}
           </span>
         </div>
       </div>
@@ -167,7 +172,7 @@ const TennesseeMap: React.FC<TennesseeMapProps> = ({ selectedRegion, onRegionCli
                 <span className={`text-xs font-bold ${
                   isSelected ? 'text-blue-900' : 'text-slate-700'
                 }`}>
-                  {region}
+                  {geoLabel(region)}
                 </span>
               </button>
             );
