@@ -87,6 +87,9 @@ export interface Destination {
   wage_median_destination: number | null;
   wage_gain_median: number | null;
   wage_gain_median_pct: number | null;
+  /** Either side's TN median wage came from the OEWS fallback ladder, not a direct
+   *  Tennessee observation. See build_acs_wages() in R/shared/00_utils.R. */
+  wage_imputed: boolean | null;
   share_stranded_origin: number | null;
   share_stranded_destination: number | null;
   diff_strandedness: number | null;

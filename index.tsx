@@ -208,6 +208,20 @@ function isCredentialRelevantToOccupation(skillName: string, destOccupation: str
 const pluralize = (name: string): string =>
   name.endsWith('s') ? name : name + 's';
 
+/** Wage gain is signed — the economic gate admits moves down to -5% of origin median,
+ *  so a destination can pay less than the origin. Format and colour by sign. */
+const formatWageGain = (v: number): string =>
+  v < 0 ? `-$${Math.abs(Math.round(v)).toLocaleString()}` : `+$${Math.round(v).toLocaleString()}`;
+
+const formatWageGainPct = (pct: number): string => {
+  const p = Math.round(pct);
+  return p > 0 ? `+${p}%` : `${p}%`;
+};
+
+const wageGainTone = (v: number, isSelected?: boolean): string =>
+  v < 0 ? (isSelected ? 'text-red-300' : 'text-red-500')
+        : (isSelected ? 'text-emerald-300' : 'text-emerald-600');
+
 /** Text clamped to the container's fixed height at whole-word boundaries. */
 const WordClampedText: React.FC<{ text: string; className?: string }> = ({ text, className }) => {
   const ref = useRef<HTMLParagraphElement>(null);
@@ -294,15 +308,17 @@ const scoreAI = (auto?: number | null, aug?: number | null, impactPct?: number |
   const palette = {
     high: { label: 'High Displacement Risk', bgSolid: 'bg-red-600 text-white border-red-700', bgPill: 'bg-red-600 text-white', bgPillDark: 'bg-red-500 text-white' },
     med: { label: 'Moderate Decline', bgSolid: 'bg-amber-500 text-white border-amber-600', bgPill: 'bg-amber-500 text-white', bgPillDark: 'bg-amber-500 text-white' },
-    low: { label: 'Stable / Growing', bgSolid: 'bg-emerald-600 text-white border-emerald-700', bgPill: 'bg-emerald-600 text-white', bgPillDark: 'bg-emerald-500 text-white' },
+    low: { label: 'Stable', bgSolid: 'bg-emerald-600 text-white border-emerald-700', bgPill: 'bg-emerald-600 text-white', bgPillDark: 'bg-emerald-500 text-white' },
     none: { label: 'No data', bgSolid: 'bg-slate-200 text-slate-500', bgPill: 'bg-slate-100 text-slate-400', bgPillDark: 'bg-white/10 text-blue-300' },
   };
   if (i === null) {
     return { auto: a, aug: g, impactPct: null, band: 'none', bandLabel: palette.none.label,
       bgSolid: palette.none.bgSolid, bgPill: palette.none.bgPill, bgPillDark: palette.none.bgPillDark };
   }
-  // Band on projected 5-year demand change; ±2% is treated as normal churn (Stable).
-  // High = ≤ −5% loss, Soft Decline = −5% to −2%, Stable/Growing = > −2%. Thresholds
+  // Band on projected 5-year demand change; ±2% is treated as normal projection churn,
+  // so the top band is named "Stable" (not "Stable / Growing") -- it spans -2% to +2% as
+  // well as genuine growth, and a green label promising growth on a negative number reads
+  // as a bug. High = ≤ −5% loss, Soft Decline = −5% to −2%, Stable = > −2%. Thresholds
   // retained for abbe-v2.0 (employment-weighted High share ≈ 17.6%, matches the report).
   let band: AIBand;
   if (i <= -5) band = 'high';
@@ -594,7 +610,7 @@ const Dashboard = () => {
     const highRiskShare = totalStranded > 0 ? Math.round((highRiskWorkers / totalStranded) * 100) : 0;
 
     const bandHex = (b: AIBand) => b === 'high' ? '#dc2626' : b === 'med' ? '#d97706' : b === 'low' ? '#059669' : '#94a3b8';
-    const bandShort = (b: AIBand) => b === 'high' ? 'High Risk' : b === 'med' ? 'Soft Decline' : b === 'low' ? 'Stable/Growing' : '—';
+    const bandShort = (b: AIBand) => b === 'high' ? 'High Risk' : b === 'med' ? 'Soft Decline' : b === 'low' ? 'Stable' : '—';
 
     const topPathways = destinationPathways.slice(0, 5);
     const briefDate = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -698,7 +714,7 @@ const Dashboard = () => {
           </tr>`).join('')}
           </tbody>
         </table>
-        <p style="font-size: 10px; color: #94a3b8; margin-top: 8px; font-style: italic;">5yr demand = BGI's demand-adjusted projection of employer need for the occupation, accounting for AI adoption pace, demand elasticity, and physical-task constraints. High Risk = projected ≤ −5% · Soft Decline = −5% to −2% · Stable/Growing = &gt; −2%.</p>
+        <p style="font-size: 10px; color: #94a3b8; margin-top: 8px; font-style: italic;">5yr demand = BGI's demand-adjusted projection of employer need for the occupation, accounting for AI adoption pace, demand elasticity, and physical-task constraints. High Risk = projected ≤ −5% · Soft Decline = −5% to −2% · Stable = &gt; −2% (±2% is treated as normal projection churn).</p>
         ` : ''}
 
         <div class="footer">Tennessee BGI Strategic Workforce Initiative · ${esc(geoLabel)} · ${esc(sector)} · Page 2 / 3</div>
@@ -725,7 +741,7 @@ const Dashboard = () => {
             <h3>Destination ${String(i + 1).padStart(2, '0')}${p.similarity_rating ? ` · ${esc(p.similarity_rating.charAt(0).toUpperCase() + p.similarity_rating.slice(1))} similarity` : ''}</h3>
             <p class="rec-title">${esc(p.name)}</p>
             <div class="rec-row">
-              <span><strong style="color: #fef3c7;">Wage gain:</strong> +$${Math.round(wg).toLocaleString()} (${Math.round(wgp * 100)}%)</span>
+              <span><strong style="color: #fef3c7;">Wage gain:</strong> ${formatWageGain(wg)} (${formatWageGainPct(wgp * 100)})</span>
               <span><strong style="color: #fef3c7;">Strandedness change:</strong> ${Math.round(ds * 100)}%</span>
               <span><strong style="color: #fef3c7;">TN demand:</strong> ${esc(p.demand_category || 'N/A')}</span>
               ${sDest.band !== 'none' && sDest.impactPct !== null ? `<span class="rec-pill" style="background: ${bandHex(sDest.band)}; color: white;">${bandShort(sDest.band)} · ${sDest.impactPct >= 0 ? '+' : ''}${sDest.impactPct.toFixed(0)}% 5yr</span>` : ''}
@@ -969,13 +985,17 @@ const Dashboard = () => {
                       : <p className="text-xs text-slate-400 italic">No workers in this selection.</p>}
                   </div>
                 </div>
-                {!stalledBreakdowns.durationSuppressed && (
-                  <div>
-                    <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
-                      <TrendingUp size={14} className="text-emerald-700"/> Stall Duration
-                    </p>
-                    <div className="space-y-3">
-                      {stalledBreakdowns.durations.some(([, v]) => (v as number) > 0)
+                <div>
+                  <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
+                    <TrendingUp size={14} className="text-emerald-700"/> Stall Duration
+                  </p>
+                  <div className="space-y-3">
+                    {stalledBreakdowns.durationSuppressed
+                      ? <p className="text-xs text-slate-400 italic">
+                          Insufficient data &mdash; fewer than {meta.thresholds.min_stall_duration_sample} observed
+                          workers with a completed stall spell in this selection.
+                        </p>
+                      : stalledBreakdowns.durations.some(([, v]) => (v as number) > 0)
                         ? (() => {
                             const maxDur = Math.max(...stalledBreakdowns.durations.map(([, v]) => v as number), 1);
                             return stalledBreakdowns.durations.map(([label, val]) => (
@@ -983,9 +1003,8 @@ const Dashboard = () => {
                             ));
                           })()
                         : <p className="text-xs text-slate-400 italic">No stall-duration data for this selection.</p>}
-                    </div>
                   </div>
-                )}
+                </div>
               </div>
             ) : (
               // Low Wage / Underemployed / All Stranded: 3 columns — occ | age | edu
@@ -1139,7 +1158,7 @@ const Dashboard = () => {
                           <p className="text-sm italic mt-1">No AI projection data.</p>
                         )}
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-72 text-center z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
-                          BGI's demand-adjusted 5-year projection: how employer need for this occupation is expected to shift, after accounting for AI adoption pace, demand elasticity, and physical-task constraints. Bands: High Risk ≤ −5%, Moderate Decline −5% to −2%, Stable/Growing &gt; −2%.
+                          BGI's demand-adjusted 5-year projection: how employer need for this occupation is expected to shift, after accounting for AI adoption pace, demand elasticity, and physical-task constraints. Bands: High Risk ≤ −5%, Moderate Decline −5% to −2%, Stable &gt; −2% (±2% is treated as normal projection churn).
                         </div>
                       </div>
                     );
@@ -1207,11 +1226,18 @@ const Dashboard = () => {
                           isSelected ? 'bg-blue-900 border-blue-900 shadow-xl -translate-y-1' : 'bg-white border-slate-100 hover:border-blue-300 hover:shadow-sm'}`}>
                         <p className={`text-xs md:text-sm font-black leading-snug mb-3 ${isSelected ? 'text-blue-200' : 'text-slate-800'}`}>{p.name}</p>
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className={`text-[8px] md:text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>Wage Gain</span>
-                            <span className={`text-[11px] md:text-xs font-black ${isSelected ? 'text-emerald-300' : 'text-emerald-600'}`}>
-                              {wageGain < 0 ? `-$${Math.abs(wageGain).toLocaleString()}` : `+$${wageGain.toLocaleString()}`} ({wagePct > 0 ? `+${wagePct}` : wagePct}%)
+                          <div className="flex items-center justify-between group relative">
+                            <span className={`text-[8px] md:text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>
+                              Wage Gain{p.wage_imputed ? '*' : ''}
                             </span>
+                            <span className={`text-[11px] md:text-xs font-black ${wageGainTone(wageGain, isSelected)}`}>
+                              {formatWageGain(wageGain)} ({formatWageGainPct(wagePct)})
+                            </span>
+                            {p.wage_imputed && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56 text-center z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
+                                Indicative, not measured. BLS publishes no separate Tennessee wage for one of these occupations, so it is estimated from the combined occupation group BLS does publish, or from the national wage rescaled to Tennessee within the same occupation group.
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center justify-between">
                             <span className={`text-[8px] md:text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>Strandedness</span>
@@ -1250,7 +1276,7 @@ const Dashboard = () => {
                               <span className={`text-[8px] md:text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>AI Outlook</span>
                               <AIBadge auto={p.ai.auto_exposure} aug={p.ai.aug_exposure} impactPct={p.ai.impact_pct_baseline} isSelected={isSelected} />
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56 text-center z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
-                                BGI's demand-adjusted 5-year projection of the change in employer demand for the destination occupation, accounting for AI adoption pace, demand elasticity, and physical-task constraints. Decline ≤ −5%, Soft decline −5% to −2%, Stable/Growing &gt; −2%.
+                                BGI's demand-adjusted 5-year projection of the change in employer demand for the destination occupation, accounting for AI adoption pace, demand elasticity, and physical-task constraints. Decline ≤ −5%, Soft decline −5% to −2%, Stable &gt; −2% (±2% is treated as normal projection churn).
                               </div>
                             </div>
                           )}
@@ -1275,8 +1301,25 @@ const Dashboard = () => {
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <p className="text-sm text-slate-400 font-bold">No pathway data available for this occupation in the selected mode.</p>
-                  <p className="text-xs text-slate-300 mt-2">Try switching to {pathwayMode === 'transitions' ? '"Jobs with Highly Similar Skills"' : '"Historically Common Transitions"'} mode.</p>
+                  {/* Two distinct empty states. When the occupation has no pathways.json entry
+                      at all it is not scored in the model, and switching mode cannot help --
+                      transitions already fall back to similarity above. Only suggest the mode
+                      switch when the occupation IS scored but the chosen mode is empty. */}
+                  {!originPaths ? (
+                    <>
+                      <p className="text-sm text-slate-400 font-bold">No career-pathway data is published for {targetOccupation}.</p>
+                      <p className="text-xs text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
+                        This occupation is not scored in the next-step model &mdash; usually because BLS
+                        publishes no separate Tennessee wage for it, or because it is an
+                        &ldquo;&hellip;, All Other&rdquo; residual category with no distinct skill profile.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-slate-400 font-bold">No pathway data available for this occupation in the selected mode.</p>
+                      <p className="text-xs text-slate-300 mt-2">Try switching to {pathwayMode === 'transitions' ? '"Jobs with Highly Similar Skills"' : '"Historically Common Transitions"'} mode.</p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -1580,9 +1623,12 @@ const Dashboard = () => {
                         </div>
                         <div>
                           <p className="text-[10px] md:text-[11px] font-bold uppercase text-blue-300 tracking-widest mb-1 md:mb-2">Wage Gain</p>
-                          <p className="text-2xl md:text-3xl font-black">+${(selectedDestRow.wage_gain_median ?? 0).toLocaleString()}</p>
+                          <p className={`text-2xl md:text-3xl font-black ${(selectedDestRow.wage_gain_median ?? 0) < 0 ? 'text-red-400' : ''}`}>
+                            {formatWageGain(selectedDestRow.wage_gain_median ?? 0)}
+                          </p>
                           <p className="text-[10px] text-blue-300 mt-1">
-                            {Math.round((selectedDestRow.wage_gain_median_pct ?? 0) * 100)}% increase &bull; To ${(selectedDestRow.wage_median_destination ?? 0).toLocaleString()}/yr
+                            {Math.abs(Math.round((selectedDestRow.wage_gain_median_pct ?? 0) * 100))}%{' '}
+                            {(selectedDestRow.wage_gain_median ?? 0) < 0 ? 'decrease' : 'increase'} &bull; To ${(selectedDestRow.wage_median_destination ?? 0).toLocaleString()}/yr
                           </p>
                         </div>
                       </div>
