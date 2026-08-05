@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-04 17:58:45",
-  "pub_date": "2026.08.04",
+  "generated_at": "2026-08-05 15:40:45",
+  "pub_date": "2026.08.05",
   "vintages": {
     "pdl_stall": {
       "run_date": "2026-07-15",
@@ -21,6 +21,9 @@
       "scenario_id": "default",
       "horizon": "5y",
       "scored": 505,
+      "employment_base": "OEWS 2024 TN (area 47, detailed) apportioned to ACS-SOC5",
+      "employment_total": 3265290,
+      "employment_universe": "ALL-TENNESSEE: every OEWS-published TN job, including the managers and classroom teachers the stall and ACS strandedness universes exclude. Larger base than those files -- do not cross-add AI headcounts with stranded or stalled counts.",
       "note": "abbe-v2.0 is NOT the model version behind the published report's AI figures. Check the impact_pct distribution against the dashboard's risk bands before publishing."
     }
   },

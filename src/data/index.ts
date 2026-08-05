@@ -63,7 +63,16 @@ export interface CohortSlice { top_occupations: Pair[]; demographics: Demographi
 
 export interface GeoSectorSlice {
   stats: Stats;
-  stalled: { durations: Pair[]; duration_suppressed: boolean; duration_n_obs: number | null };
+  stalled: {
+    durations: Pair[];
+    /** Which rung of the shape ladder the histogram rests on (build_web_views.R). */
+    duration_basis: 'cell' | 'sector' | 'statewide' | 'none';
+    duration_suppressed: boolean;
+    /** Completed spells behind the shape actually used (the pooled count when borrowed). */
+    duration_n_obs: number | null;
+    /** Completed spells in this slice itself, whatever the shape rests on. */
+    duration_cell_n_obs: number;
+  };
   cohorts: Record<CohortType, CohortSlice>;
 }
 

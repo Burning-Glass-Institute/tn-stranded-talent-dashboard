@@ -467,7 +467,11 @@ const Dashboard = () => {
   const stalledBreakdowns = useMemo(() => ({
     occMix: (slice?.cohorts?.['Stalled']?.top_occupations ?? []) as [string, number][],
     durations: (slice?.stalled?.durations ?? []) as [string, number][],
-    durationSuppressed: slice?.stalled?.duration_suppressed ?? false,
+    durationSuppressed: slice?.stalled?.duration_suppressed ?? true,
+    durationBasis: slice?.stalled?.duration_basis ?? 'none',
+    durationNObs: slice?.stalled?.duration_n_obs ?? null,
+    durationCellNObs: slice?.stalled?.duration_cell_n_obs ?? 0,
+    stalledCount: slice?.stats?.stalled ?? 0,
   }), [slice]);
 
   /** Age + education breakdowns for the selected cohort (already ordered & resolved). */
@@ -988,22 +992,50 @@ const Dashboard = () => {
                 <div>
                   <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
                     <TrendingUp size={14} className="text-emerald-700"/> Stall Duration
+                    {/* Only the SHAPE is borrowed; bar heights are always this slice's own
+                        stalled count. See the ladder in R/reports/build_web_views.R. */}
+                    {stalledBreakdowns.durationBasis === 'sector' && (
+                      <span className="ml-auto normal-case tracking-normal font-bold text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        {sector} pattern statewide
+                      </span>
+                    )}
+                    {stalledBreakdowns.durationBasis === 'statewide' && (
+                      <span className="ml-auto normal-case tracking-normal font-bold text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                        Tennessee-wide pattern
+                      </span>
+                    )}
                   </p>
                   <div className="space-y-3">
-                    {stalledBreakdowns.durationSuppressed
-                      ? <p className="text-xs text-slate-400 italic">
-                          Insufficient data &mdash; fewer than {meta.thresholds.min_stall_duration_sample} observed
-                          workers with a completed stall spell in this selection.
-                        </p>
-                      : stalledBreakdowns.durations.some(([, v]) => (v as number) > 0)
-                        ? (() => {
+                    {stalledBreakdowns.stalledCount <= 0
+                      ? <p className="text-xs text-slate-400 italic">No stalled workers in this selection.</p>
+                      : stalledBreakdowns.durationSuppressed
+                        ? <p className="text-xs text-slate-400 italic">
+                            Duration not shown &mdash; no completed stall spells are observed
+                            for this selection or any wider grouping.
+                          </p>
+                        : (() => {
                             const maxDur = Math.max(...stalledBreakdowns.durations.map(([, v]) => v as number), 1);
                             return stalledBreakdowns.durations.map(([label, val]) => (
                               <ProgressBar key={label} label={label} value={Math.round(val as number)} max={Math.round(maxDur)} colorClass="bg-emerald-700" />
                             ));
-                          })()
-                        : <p className="text-xs text-slate-400 italic">No stall-duration data for this selection.</p>}
+                          })()}
                   </div>
+                  {stalledBreakdowns.stalledCount > 0 && !stalledBreakdowns.durationSuppressed
+                    && stalledBreakdowns.durationBasis !== 'cell' && (
+                    <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
+                      Measuring how <em>long</em> a stall lasts needs workers observed both
+                      entering and leaving one, which is far rarer than being in a stall.
+                      Only {stalledBreakdowns.durationCellNObs.toLocaleString()} such completed
+                      {stalledBreakdowns.durationCellNObs === 1 ? ' spell falls' : ' spells fall'} in
+                      {' '}{geography === 'All' ? 'this selection' : `${geography} / ${sector}`},
+                      below the threshold of {meta.thresholds.min_stall_duration_sample}, so the
+                      shape above is the{' '}
+                      {stalledBreakdowns.durationBasis === 'sector' ? `${sector} pattern across Tennessee` : 'Tennessee-wide pattern'}
+                      {' '}({stalledBreakdowns.durationNObs?.toLocaleString()} spells) applied to this
+                      selection&rsquo;s {Math.round(stalledBreakdowns.stalledCount).toLocaleString()} stalled
+                      workers. The count is measured; the split across years is indicative.
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1235,7 +1267,7 @@ const Dashboard = () => {
                             </span>
                             {p.wage_imputed && (
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56 text-center z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
-                                Indicative, not measured. BLS publishes no separate Tennessee wage for one of these occupations, so it is estimated from the combined occupation group BLS does publish, or from the national wage rescaled to Tennessee within the same occupation group.
+                                Indicative, not measured. BLS publishes no separate Tennessee wage for one of these occupations, so it is estimated from the combined occupation group BLS does publish, from the national wage rescaled to Tennessee within the same occupation group, or — where BLS publishes no wage at any grain — from the median wage Tennessee workers report in the American Community Survey.
                               </div>
                             )}
                           </div>
