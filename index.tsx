@@ -208,6 +208,14 @@ function isCredentialRelevantToOccupation(skillName: string, destOccupation: str
 const pluralize = (name: string): string =>
   name.endsWith('s') ? name : name + 's';
 
+/** Low-prep on-ramp: a destination the formatter swapped in over the weakest ranked move,
+ *  for origins whose ranked destinations all need substantial preparation. R writes a JSON
+ *  boolean, but the field has historically arrived as 1/"TRUE" too, so accept all three. */
+const isOnRamp = (p: { low_prep_addon?: number | string | boolean | null }): boolean => {
+  const v = p.low_prep_addon;
+  return v === true || v === 1 || (typeof v === 'string' && v.toUpperCase() === 'TRUE');
+};
+
 /** Wage gain is signed — the economic gate admits moves down to -5% of origin median,
  *  so a destination can pay less than the origin. Format and colour by sign. */
 const formatWageGain = (v: number): string =>
@@ -1257,6 +1265,23 @@ const Dashboard = () => {
                         className={`p-4 md:p-5 rounded-2xl md:rounded-3xl border-2 cursor-pointer transition-all duration-300 ${
                           isSelected ? 'bg-blue-900 border-blue-900 shadow-xl -translate-y-1' : 'bg-white border-slate-100 hover:border-blue-300 hover:shadow-sm'}`}>
                         <p className={`text-xs md:text-sm font-black leading-snug mb-3 ${isSelected ? 'text-blue-200' : 'text-slate-800'}`}>{p.name}</p>
+                        {/* An on-ramp is by construction NOT among the top ranked moves -- it
+                            displaces the weakest one so an origin with no low-preparation option
+                            still shows a realistic near-term step. Label it, or it reads as a
+                            top-5 result under a heading that promises exactly that. */}
+                        {isOnRamp(p) && (
+                          <div className="group relative -mt-2 mb-3">
+                            <span className={`inline-block text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                              isSelected ? 'bg-amber-400/20 text-amber-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
+                              Low-prep on-ramp
+                            </span>
+                            <div className="absolute bottom-full left-0 mb-1 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56 z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
+                              Not one of the highest-ranked moves. It is shown because none of them
+                              needs little additional preparation, and this one does — a realistic
+                              starting point rather than the strongest destination.
+                            </div>
+                          </div>
+                        )}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between group relative">
                             <span className={`text-[8px] md:text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>

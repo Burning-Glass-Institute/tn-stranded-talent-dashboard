@@ -104,7 +104,7 @@ export interface Destination {
   diff_strandedness: number | null;
   prep_label: string | null;
   qualifies_because: string | null;
-  low_prep_addon: number | string | null;
+  low_prep_addon: number | string | boolean | null;
   blend_source: string | null;
   demand_category: string | null;
   demand_growth_category: string | null;
