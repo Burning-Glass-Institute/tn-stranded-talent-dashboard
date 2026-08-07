@@ -61,7 +61,9 @@ const TennesseeMap: React.FC<TennesseeMapProps> = ({ selectedRegion, onRegionCli
       let msaCategory = (countyMapping as any)[countyName] || 'Other MSA';
       // Merge any legacy 'Rural' into 'Other MSA'
       if (msaCategory === 'Rural') msaCategory = 'Other MSA';
-      groups[msaCategory].push(feature);
+      // An unrecognized crosswalk value would make groups[msaCategory] undefined and
+      // crash the whole app on .push — bucket it with Other MSA instead.
+      (groups[msaCategory] ?? groups['Other MSA']).push(feature);
     });
 
     return groups;
@@ -69,13 +71,16 @@ const TennesseeMap: React.FC<TennesseeMapProps> = ({ selectedRegion, onRegionCli
 
   // Get region fill color with more diverse palette
   const getRegionColor = (region: MSACategory, isSelected: boolean, isHovered: boolean): string => {
+    // Hover feedback wins even when "All Tennessee" is selected — checking the
+    // All-branch first left legend hovers with no visible response on the map.
+    if (isHovered) return '#93C5FD'; // Light blue for hover
+
     // If "All Tennessee" is selected, show all regions in a unified color
     if (selectedRegion === 'All') {
       return '#1E3A8A'; // Navy blue for all regions when "All" is selected
     }
 
     if (isSelected) return '#1E3A8A'; // Navy blue for selected
-    if (isHovered) return '#93C5FD'; // Light blue for hover
 
     // More diverse color palette for better distinction
     const baseColors: Record<MSACategory, string> = {
@@ -92,8 +97,21 @@ const TennesseeMap: React.FC<TennesseeMapProps> = ({ selectedRegion, onRegionCli
   // Region order for legend
   const regionOrder: MSACategory[] = ['Nashville', 'Memphis', 'Knoxville', 'Chattanooga', 'Other MSA'];
 
-  // When a Grand Division is selected or hovered, county fill is decided per
-  // county via the tn.gov county-to-division crosswalk rather than per MSA group.
+  // County lists for the note under the map, derived from the crosswalk rather than
+  // hard-coded so the two can never disagree.
+  const divisionCounties = useMemo(() => {
+    const groups: Record<GrandDivision, string[]> = { East: [], Middle: [], West: [] };
+    Object.entries(countyDivisionMapping as Record<string, GrandDivision>)
+      .forEach(([county, division]) => groups[division]?.push(county));
+    GRAND_DIVISIONS.forEach(d => groups[d].sort());
+    return groups;
+  }, []);
+
+  // When a Grand Division is selected or hovered, county fill is decided per county
+  // via the county-to-division crosswalk rather than per MSA group. That crosswalk
+  // mirrors input/tn_county_lwda_region_crosswalk.csv -- the WIOA-area grouping the
+  // Region estimates are actually tabulated on, NOT the statutory divisions (they
+  // differ on Cumberland and Sequatchie; see the note under the map).
   const selectedDivision = GRAND_DIVISIONS.includes(selectedRegion as GrandDivision) ? (selectedRegion as GrandDivision) : null;
   const hoveredDivision = hoveredRegion && GRAND_DIVISIONS.includes(hoveredRegion as GrandDivision) ? (hoveredRegion as GrandDivision) : null;
 
@@ -246,6 +264,26 @@ const TennesseeMap: React.FC<TennesseeMapProps> = ({ selectedRegion, onRegionCli
           </svg>
         </div>
       </div>
+
+      {/* Which counties sit in which division. Generated from the same crosswalk the
+          map colours by, so the note and the shading can never drift apart. */}
+      <details className="border-t border-slate-200 pt-3 group">
+        <summary className="text-[10px] font-bold text-slate-400 uppercase tracking-widest cursor-pointer hover:text-slate-600 list-none">
+          Counties by division
+          <span className="ml-1 font-normal normal-case tracking-normal">(grouped on WIOA workforce areas)</span>
+        </summary>
+        <div className="mt-2 space-y-1">
+          {GRAND_DIVISIONS.map(division => (
+            <p key={division} className="text-[10px] leading-snug text-slate-400">
+              <span className="font-bold text-slate-500">{division} ({divisionCounties[division].length})</span>
+              {' '}{divisionCounties[division].join(', ')}
+            </p>
+          ))}
+          <p className="text-[10px] leading-snug text-slate-400 italic">
+            Cumberland and Sequatchie follow their workforce areas rather than the statutory divisions.
+          </p>
+        </div>
+      </details>
     </div>
   );
 };

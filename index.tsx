@@ -32,6 +32,10 @@ import {
   type CohortType, type Destination, type SkillsData,
 } from './src/data';
 
+/** Deploy base path. The public site is served from a repo subpath, so every asset
+ *  link must be built on this — a root-absolute href works in dev and 404s in prod. */
+const BASE_URL: string = (import.meta as any).env?.BASE_URL || '/';
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -48,6 +52,8 @@ const REGION_GEOS = new Set(['East', 'Middle', 'West']);
  *  an "MSA" label would misleadingly imply rural is excluded. */
 const OTHER_MSA_LABEL = 'Other & Rural TN';
 const geoDisplay = (g: string) => (g === 'Other MSA' ? OTHER_MSA_LABEL : g);
+/** 'Stalled' is the data key; every user-facing surface says "Career Stalled". */
+const cohortDisplay = (c: string) => (c === 'Stalled' ? 'Career Stalled' : c);
 
 // ============================================================================
 // CONSTANTS
@@ -205,8 +211,9 @@ function isCredentialRelevantToOccupation(skillName: string, destOccupation: str
 // HELPER COMPONENTS
 // ============================================================================
 
-const pluralize = (name: string): string =>
-  name.endsWith('s') ? name : name + 's';
+// SOC occupation titles are already plural nouns ("Office Clerks, General",
+// "Clergy") — appending an "s" produced "Office Clerks, Generals"/"Clergys".
+// Prose that needs a plural phrases around the title ("workers in X roles").
 
 /** Low-prep on-ramp: a destination the formatter swapped in over the weakest ranked move,
  *  for origins whose ranked destinations all need substantial preparation. R writes a JSON
@@ -314,8 +321,9 @@ const scoreAI = (auto?: number | null, aug?: number | null, impactPct?: number |
   const g = (aug === undefined || aug === null || isNaN(aug)) ? null : aug;
   const i = (impactPct === undefined || impactPct === null || isNaN(impactPct)) ? null : impactPct;
   const palette = {
-    high: { label: 'High Displacement Risk', bgSolid: 'bg-red-600 text-white border-red-700', bgPill: 'bg-red-600 text-white', bgPillDark: 'bg-red-500 text-white' },
-    med: { label: 'Moderate Decline', bgSolid: 'bg-amber-500 text-white border-amber-600', bgPill: 'bg-amber-500 text-white', bgPillDark: 'bg-amber-500 text-white' },
+    // Canonical band names — used verbatim everywhere (tiles, pills, tooltips, brief).
+    high: { label: 'High Risk', bgSolid: 'bg-red-600 text-white border-red-700', bgPill: 'bg-red-600 text-white', bgPillDark: 'bg-red-500 text-white' },
+    med: { label: 'Soft Decline', bgSolid: 'bg-amber-500 text-white border-amber-600', bgPill: 'bg-amber-500 text-white', bgPillDark: 'bg-amber-500 text-white' },
     low: { label: 'Stable', bgSolid: 'bg-emerald-600 text-white border-emerald-700', bgPill: 'bg-emerald-600 text-white', bgPillDark: 'bg-emerald-500 text-white' },
     none: { label: 'No data', bgSolid: 'bg-slate-200 text-slate-500', bgPill: 'bg-slate-100 text-slate-400', bgPillDark: 'bg-white/10 text-blue-300' },
   };
@@ -344,7 +352,7 @@ const AIBadge: React.FC<{ auto?: number | null; aug?: number | null; impactPct?:
   }
   const ip = s.impactPct as number;
   const ipRounded = Math.round(ip);
-  const shortLabel = s.band === 'high' ? 'Decline' : s.band === 'med' ? 'Soft' : (ipRounded >= 1 ? 'Growth' : 'Stable');
+  const shortLabel = s.band === 'high' ? 'High Risk' : s.band === 'med' ? 'Soft Decline' : (ipRounded >= 1 ? 'Growth' : 'Stable');
   const ipStr = `${ipRounded >= 0 ? '+' : ''}${ipRounded}%`;
   return (
     <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${isSelected ? s.bgPillDark : s.bgPill}`}>
@@ -360,27 +368,27 @@ const AIBadge: React.FC<{ auto?: number | null; aug?: number | null; impactPct?:
 
 const REPORT_GEO_CONTEXT: Record<string, string> = {
   'Nashville': 'Nashville consistently posts the lowest strandedness rates in the state — 16.5% low-wage versus 5–8pp higher elsewhere — driven by a deeper professional-tier employer base. The local lesson: where you work and where you live shape the chances of getting ahead at least as much as how hard you work or how much education you have.',
-  'Memphis': 'Memphis carries a structural mismatch on returns to education: master\'s-degree holders here have more than double the underemployment rate of their Nashville counterparts (13.4% vs 5.5%) — the single largest intra-credential gap in the data. The city produces or attracts graduate-credentialled workers but does not generate enough roles that require and reward those credentials. Younger workers feel this most acutely: 37.7% of Memphis 25–34-year-olds are stranded, against 27.2% in Nashville.',
-  'Knoxville': 'Knoxville\'s wage strandedness is concentrated in specific sectors rather than spread evenly across the labour market. Accommodation and food services posts a 70.6% low-wage rate locally — the single highest sector-MSA combination in the dataset, 22pp above Memphis and 32pp above Nashville for the same sector. Utilities also shows an anomalous 10.9% underemployment rate against a 2.7% state norm, hinting at over-qualified workers absorbed into available technical roles for lack of alternatives.',
+  'Memphis': 'Memphis carries a structural mismatch on returns to education: master\'s-degree holders here have more than double the underemployment rate of their Nashville counterparts (13.4% vs 5.5%) — the single largest intra-credential gap in the data. The city produces or attracts graduate-credentialed workers but does not generate enough roles that require and reward those credentials. Younger workers feel this most acutely: 37.7% of Memphis 25–34-year-olds are stranded, against 27.2% in Nashville.',
+  'Knoxville': 'Knoxville\'s wage strandedness is concentrated in specific sectors rather than spread evenly across the labor market. Accommodation and food services posts a 70.6% low-wage rate locally — the single highest sector-MSA combination in the dataset, 22pp above Memphis and 32pp above Nashville for the same sector. Utilities also shows an anomalous 10.9% underemployment rate against a 2.7% state norm, hinting at over-qualified workers absorbed into available technical roles for lack of alternatives.',
   'Chattanooga': 'Strandedness in Chattanooga is driven primarily by wage levels rather than qualification mismatch — underemployment sits at or below state norms in most sectors. Workers without a high-school diploma face an especially severe wage burden: 47.7% are low-wage in Chattanooga, against 36.7% in Nashville, reflecting limited entry-level progression infrastructure.',
   'Other MSA': 'Rural Tennessee and smaller MSAs carry the heaviest low-wage burden in the state. College-degree holders here face strandedness rates well above the urban average — not because they are overqualified in the abstract, but because their local economies simply do not generate enough roles that match what they can do. 27.4% of rural bachelor\'s-degree holders are stranded overall, 7pp above Nashville.',
-  'All': 'Roughly one in four working Tennesseans is stranded. Geographic variation is one of the most striking findings in the report — Nashville sits notably below the rest of the state on low-wage strandedness, while Memphis, Knoxville, Chattanooga, and rural areas each show a distinct profile of where the problem concentrates.',
+  'All': 'Roughly one in four working Tennesseans is low-wage or underemployed — before counting the career-stalled workers this dashboard adds as a third cohort. Geographic variation is one of the most striking findings in the report — Nashville sits notably below the rest of the state on low-wage strandedness, while Memphis, Knoxville, Chattanooga, and rural areas each show a distinct profile of where the problem concentrates.',
 };
 
 const REPORT_SECTOR_CONTEXT: Record<string, string> = {
   'Accommodation and Food Services': 'The most severely stranded sector in the state — 54.2% of workers are low-wage and a further 12.0% are underemployed. The wide dispersion in low-wage strandedness across sectors means industry of employment is one of the strongest single predictors of strandedness in Tennessee.',
   'Administrative and Support and Waste Management': 'Administrative and support services is one of the most stranded sectors statewide (33.4% low-wage), with Memphis the sharpest case at 46.0% — a 12pp gap above the state average that points to local wage-floor suppression.',
   'Retail Trade': 'Retail is among the most stranded sectors in the state. Knoxville posts an 11.3% retail underemployment rate (statewide retail: 7.0%), pointing to qualified workers absorbed into available roles in the absence of better local options.',
-  'Health Care and Social Assistance': 'Healthcare is the most AI-resilient large sector in the state (52% average automation exposure, only 14% of workers in top-quartile high-exposure roles) — and the Healthcare Ladder is the highest-impact transition pathway by average wage gain. Tennessee already has the community college infrastructure to support these transitions at scale.',
-  'Manufacturing': 'Manufacturing in Tennessee shows above-average underemployment in Memphis (7.3%), suggesting graduate-credentialled workers take available production roles in the absence of professional-tier demand. Statewide stalling rates in manufacturing run higher than service sectors (4.5% in Knoxville).',
-  'Transportation and Warehousing': 'Transportation and warehousing has by far the highest share of workers in top-quartile AI-high-exposure occupations of any large sector (76%). In Nashville and the Other MSA category, more than 89% and 94% respectively of workers in this sector are in top-quartile AI-exposure roles — a notable finding for a state that has invested heavily in logistics infrastructure.',
-  'Construction': 'Construction sits in the more AI-exposed half of Tennessee\'s sectoral profile (61% average automation exposure, 42% in top-quartile high-exposure occupations). Memphis construction also shows elevated low-wage rates (26.6%) relative to Nashville and the state overall.',
+  'Health Care and Social Assistance': 'The Healthcare Ladder is the highest-impact transition pathway by average wage gain, and Tennessee already has the community college infrastructure to support these transitions at scale.',
+  'Manufacturing': 'Manufacturing in Tennessee shows above-average underemployment in Memphis (8.3%), suggesting graduate-credentialed workers take available production roles in the absence of professional-tier demand. Statewide stalling rates in manufacturing run higher than service sectors (5.4% in Knoxville).',
+  'Transportation and Warehousing': 'Transportation and warehousing anchors one of the state\'s largest stranded workforces — driver and material-moving occupations are among the biggest career-stalled groups statewide — a notable finding for a state that has invested heavily in logistics infrastructure.',
+  'Construction': 'Memphis construction shows elevated low-wage rates (26.6%) relative to Nashville and the state overall.',
   'Information': 'Information shows a striking divergence by geography. Memphis posts a 19.9% underemployment rate — the highest of any MSA for the sector and more than 5× Nashville\'s rate — while rural Tennessee posts 14.6%. Together these patterns suggest the sector retains degree-holding workers without absorbing them into roles commensurate with their qualifications.',
   'Finance and Insurance': 'Finance and insurance sits at the lower end of Tennessee\'s strandedness spectrum (low-wage rate <11%) and is a frequent destination in the Professional & Financial Services pathway — one of the highest-impact destranding routes in the report.',
-  'Wholesale Trade': 'Wholesale trade shows above-average low-wage strandedness in Memphis (34.6%) and is among the more AI-exposed sectors (60% average automation exposure).',
+  'Wholesale Trade': 'Wholesale trade shows above-average low-wage strandedness in Memphis (34.6%).',
   'Professional, Scientific, and Technical Services': 'Professional, scientific and technical services sits at the lower-strandedness end of the state spectrum and is a common destination occupation in the Technology Pivot and Professional & Financial Services pathways.',
   'Public Administration': 'Public administration shows modest career stalling rates (5.0% in Knoxville, highest within that MSA) but is largely AI-resilient relative to the state average.',
-  'Educational Services': 'Education contains a known structural mismatch: Teaching Assistants represent the largest single career-stalling cohort statewide (2,160 workers) while the Education Credentialing pathway shows very low observed transition volume — pointing to the absence of an accessible fast-track licensure route.',
+  'Educational Services': 'Education contains a known structural mismatch: Teaching Assistants are the sector\'s largest career-stalled group statewide (roughly 190 workers, with classroom teachers tracked separately) while the Education Credentialing pathway shows very low observed transition volume — pointing to the absence of an accessible fast-track licensure route.',
   'Utilities': 'Utilities is normally a low-strandedness sector statewide, but Knoxville is an exception with a 10.9% underemployment rate against the state\'s 2.7% — flagging a specific skills mismatch at TVA or other area utilities employers.',
   'Real Estate and Rental and Leasing': 'Real estate and rental/leasing in rural Tennessee shows elevated low-wage (40.6%) and underemployment (11.0%) rates relative to other geographies.',
   'Arts, Entertainment, and Recreation': 'Arts, entertainment and recreation in rural Tennessee shows the highest low-wage rate of any rural sector (52.4%) and one of the highest underemployment rates in the dataset (21.4%) — reflecting seasonality, part-time work, and the absence of anchor employers.',
@@ -408,7 +416,7 @@ const App = () => {
         <div className="max-w-md text-center">
           <p className="text-sm font-black text-red-600 uppercase tracking-widest mb-2">Failed to load dashboard data</p>
           <p className="text-xs text-slate-500">{error}</p>
-          <p className="text-xs text-slate-400 mt-4">The view store (public/data/*.json) may be missing. Run the prebuild sync.</p>
+          <p className="text-xs text-slate-400 mt-4">Refresh the page; if this persists, contact the Burning Glass Institute.</p>
         </div>
       </div>
     );
@@ -444,11 +452,28 @@ const Dashboard = () => {
   const [pathwayMode, setPathwayMode] = useState<'transitions' | 'similarity'>('transitions');
   const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
   const [skills, setSkills] = useState<SkillsData | null>(null);
+  const [showSources, setShowSources] = useState(false);
+  const [skillsError, setSkillsError] = useState(false);
 
   // Lazily fetch the skills payload (largest file) once a destination is chosen.
+  // A swallowed failure left "Loading skill data…" on screen forever; track it so
+  // the panel can say so, and retry on the next destination change.
   useEffect(() => {
-    if (selectedDestination && !skills) loadSkills().then(setSkills).catch(() => {});
+    if (selectedDestination && !skills) {
+      setSkillsError(false);
+      loadSkills().then(setSkills).catch(() => setSkillsError(true));
+    }
   }, [selectedDestination, skills]);
+
+  // Close the Sources modal on Escape; suppress background scroll while open.
+  useEffect(() => {
+    if (!showSources) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowSources(false); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [showSources]);
 
   // ============================================================================
   // DERIVED DATA — key lookups into the fetched view store (no aggregation here)
@@ -464,6 +489,10 @@ const Dashboard = () => {
     lw: Math.round(slice?.stats.low_wage ?? 0),
     ue: Math.round(slice?.stats.underemployed ?? 0),
     st: Math.round(slice?.stats.stalled ?? 0),
+    // total/lw/ue are ACS; st is Profiles/OEWS. Where the ACS has no sample for a
+    // cell the first three read 0 while st stays a real measured count, so an
+    // ACS-only denominator must not be read as "this selection is empty".
+    hasAcs: slice?.stats.has_acs ?? (slice?.stats.total ?? 0) > 0,
   }), [slice]);
 
   /** Occupational breakdown for the selected cohort — pre-sorted [name, value]. */
@@ -512,10 +541,12 @@ const Dashboard = () => {
     if (!targetOccupation) return null;
     const r = getOccRef(targetOccupation);
     if (!r) return null;
+    // Nulls stay null — the tiles render "—" for unmeasured values. Coercing to 0
+    // displayed "$0" wages and told Strategy 3 that 100% of workers are full-time.
     return {
-      strandedShare: r.share_stranded ?? 0,
-      medianWage: r.median_wage ?? 0,
-      partTimeShare: r.share_part_time ?? 0,
+      strandedShare: r.share_stranded ?? null,
+      medianWage: r.median_wage ?? null,
+      partTimeShare: r.share_part_time ?? null,
       autoExposure: r.ai.auto_exposure,
       augExposure: r.ai.aug_exposure,
       useExposure: r.ai.usecase_exposure,
@@ -597,7 +628,11 @@ const Dashboard = () => {
 
     const maxOcc = Math.max(...cohortBreakdowns.occ.map(x => x[1]), 1);
     const totalStranded = stats.lw + stats.ue + stats.st;
-    const strandedPct = stats.total > 0 ? (totalStranded / stats.total) * 100 : 0;
+    // Same three-state rate logic as the dashboard: no ACS sample (or an ACS sample
+    // thinner than the Profiles-measured stalled count) means there is no valid
+    // denominator — the brief must not print "0 workers / 0%" beside real counts.
+    const briefRateKnown = stats.hasAcs && stats.total > 0 && totalStranded <= stats.total;
+    const strandedPct = briefRateKnown ? (totalStranded / stats.total) * 100 : null;
 
     const geoLabel = geography === 'All' ? 'Tennessee (statewide)' : geography === 'Other MSA' ? OTHER_MSA_LABEL : REGION_GEOS.has(geography) ? `${geography} Tennessee` : `${geography} MSA`;
     const geoContext = REPORT_GEO_CONTEXT[geography] || '';
@@ -605,20 +640,31 @@ const Dashboard = () => {
 
     // Demographics for this geo×sector cohort (pre-resolved, ordered [label, value] pairs)
     const demo = slice?.cohorts?.[selectedCohort]?.demographics;
-    const ageBuckets = (demo?.age ?? []).filter(([, v]) => v > 0) as [string, number][];
-    const eduBuckets = (demo?.education ?? []).filter(([, v]) => v > 0) as [string, number][];
+    // Keep zero-count buckets: the view store now emits the full canonical set for
+    // both dimensions, and stripping the empties here would put the exported brief
+    // back to listing a different number of education rows per slice.
+    const ageBuckets = (demo?.age ?? []) as [string, number][];
+    const eduBuckets = (demo?.education ?? []) as [string, number][];
     const maxAge = Math.max(...ageBuckets.map(([, v]) => v), 1);
     const maxEdu = Math.max(...eduBuckets.map(([, v]) => v), 1);
 
-    // Displacement risk for top occupations in this slice
+    // Displacement risk table: top occupations of the SELECTED cohort (display only).
     const topOccs = cohortBreakdowns.occ.slice(0, 6);
     const topOccsWithAI = topOccs.map(([occ, val]) => {
       const r = getOccRef(occ);
       const s = scoreAI(r?.ai.auto_exposure, r?.ai.aug_exposure, r?.ai.impact_pct_baseline);
       return { occ, workers: Math.round(val), score: s };
     });
-    const highRiskOccs = topOccsWithAI.filter(o => o.score.band === 'high');
-    const highRiskWorkers = highRiskOccs.reduce((s, o) => s + o.workers, 0);
+    // The narrated high-risk SHARE is a claim about all stranded workers, so it is
+    // computed over the full All-Stranded occupation list (top 25 emitted by R, which
+    // covers nearly all workers in a slice) — not the selected cohort's top 6, which
+    // understated the share and changed with the cohort toggle.
+    const allStrandedOcc = (slice?.cohorts?.['All Stranded']?.top_occupations ?? []) as [string, number][];
+    const highRiskWorkers = allStrandedOcc.reduce((sum, [occ, val]) => {
+      const r = getOccRef(occ);
+      const s = scoreAI(r?.ai.auto_exposure, r?.ai.aug_exposure, r?.ai.impact_pct_baseline);
+      return sum + (s.band === 'high' ? Math.round(val) : 0);
+    }, 0);
     const highRiskShare = totalStranded > 0 ? Math.round((highRiskWorkers / totalStranded) * 100) : 0;
 
     const bandHex = (b: AIBand) => b === 'high' ? '#dc2626' : b === 'med' ? '#d97706' : b === 'low' ? '#059669' : '#94a3b8';
@@ -662,31 +708,31 @@ const Dashboard = () => {
         <div class="header"><div>
           <p class="phase">Phase I · Diagnostic Inventory</p>
           <h1>${esc(geoLabel)} &middot; ${esc(sector)}</h1>
-        </div><div class="meta">Cohort: ${esc(selectedCohort)}<br>Briefing date: ${esc(briefDate)}</div></div>
+        </div><div class="meta">Cohort: ${esc(cohortDisplay(selectedCohort))}<br>Briefing date: ${esc(briefDate)}</div></div>
 
         <div class="stat-grid">
-          <div class="stat-box"><span class="stat-label">Total Workforce</span><span class="stat-val">${stats.total.toLocaleString()}</span></div>
+          <div class="stat-box"><span class="stat-label">Total Workforce</span><span class="stat-val">${briefRateKnown ? stats.total.toLocaleString() : '—'}</span></div>
           <div class="stat-box"><span class="stat-label">Stranded</span><span class="stat-val">${totalStranded.toLocaleString()}</span></div>
-          <div class="stat-box"><span class="stat-label">Stranded Rate</span><span class="stat-val">${strandedPct.toFixed(0)}%</span></div>
+          <div class="stat-box"><span class="stat-label">Stranded Rate</span><span class="stat-val">${strandedPct !== null ? `${strandedPct.toFixed(1)}%` : '—'}</span></div>
           <div class="stat-box"><span class="stat-label">In High-Risk AI Roles</span><span class="stat-val">${highRiskShare}%</span></div>
         </div>
 
         <h2>What this slice looks like</h2>
         <p class="narrative">
-          Across ${esc(geoLabel)}'s ${esc(sector)} sector, <strong>${totalStranded.toLocaleString()} workers</strong> (${strandedPct.toFixed(1)}% of the local sector workforce) meet at least one stranded-talent definition: ${stats.lw.toLocaleString()} low-wage, ${stats.ue.toLocaleString()} underemployed, and ${Math.round(stats.st).toLocaleString()} career-stalled. Of those, roughly <strong>${highRiskShare}% sit in occupations where BGI projects ≥5% employer-demand decline over the next five years</strong> — the report's "double-jeopardy" population, currently stranded and in roles where AI-driven adoption is on track to materially reduce demand for the worker's labour.
+          Across ${esc(geoLabel)}'s ${esc(sector)} sector, <strong>${totalStranded.toLocaleString()} workers</strong> ${strandedPct !== null ? `(${strandedPct.toFixed(1)}% of the local sector workforce)` : '(workforce share unavailable — the ACS survey sample cannot serve as a denominator here)'} meet at least one stranded-talent definition: ${stats.lw.toLocaleString()} low-wage, ${stats.ue.toLocaleString()} underemployed, and ${Math.round(stats.st).toLocaleString()} career-stalled. Roughly <strong>${highRiskShare}% work in occupations where BGI projects a 5%+ decline in employer demand over the next five years</strong> — the report's "double-jeopardy" population: currently stranded, and in roles where AI adoption is on track to materially reduce demand for their labor.
         </p>
 
         ${geoContext ? `<p class="narrative"><strong style="color: #1e3a8a; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em;">${esc(geography === 'All' ? 'Statewide context' : geoDisplay(geography) + ' context')}</strong><span class="quote">${esc(geoContext)}</span></p>` : ''}
         ${sectorContext ? `<p class="narrative"><strong style="color: #1e3a8a; text-transform: uppercase; font-size: 10px; letter-spacing: 0.1em;">Sector context</strong><span class="quote">${esc(sectorContext)}</span></p>` : ''}
 
-        <div class="footer">Tennessee BGI Strategic Workforce Initiative · ${esc(geoLabel)} · ${esc(sector)} · Page 1 / 3</div>
+        <div class="footer">Burning Glass Institute · Stranded Talent Interactive · ${esc(geoLabel)} · ${esc(sector)} · Page 1 / 3</div>
       </div>
 
       <!-- PAGE 2: Who they are -->
       <div class="page">
         <div class="header"><div>
           <p class="phase">Phase I · Demographic Composition</p>
-          <h1>${esc(selectedCohort)} workers in ${esc(geoLabel)} ${esc(sector)}</h1>
+          <h1>${esc(cohortDisplay(selectedCohort))} workers in ${esc(geoLabel)} ${esc(sector)}</h1>
         </div><div class="meta">${ageBuckets.length > 0 ? 'Source: BGI cross-tab of ACS microdata' : ''}</div></div>
 
         <div class="col-2">
@@ -711,7 +757,7 @@ const Dashboard = () => {
         <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
           <thead><tr style="text-align: left; color: #64748b; text-transform: uppercase; font-size: 9px; letter-spacing: 0.1em; font-weight: 800;">
             <th style="padding: 8px 6px; border-bottom: 1px solid #e2e8f0;">Occupation</th>
-            <th style="padding: 8px 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">${esc(selectedCohort)} workers</th>
+            <th style="padding: 8px 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">${esc(cohortDisplay(selectedCohort))} workers</th>
             <th style="padding: 8px 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">5yr demand</th>
             <th style="padding: 8px 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">Auto / Aug task scores</th>
             <th style="padding: 8px 6px; border-bottom: 1px solid #e2e8f0; text-align: right;">Band</th>
@@ -729,7 +775,7 @@ const Dashboard = () => {
         <p style="font-size: 10px; color: #94a3b8; margin-top: 8px; font-style: italic;">5yr demand = BGI's demand-adjusted projection of employer need for the occupation, accounting for AI adoption pace, demand elasticity, and physical-task constraints. High Risk = projected ≤ −5% · Soft Decline = −5% to −2% · Stable = &gt; −2% (±2% is treated as normal projection churn).</p>
         ` : ''}
 
-        <div class="footer">Tennessee BGI Strategic Workforce Initiative · ${esc(geoLabel)} · ${esc(sector)} · Page 2 / 3</div>
+        <div class="footer">Burning Glass Institute · Stranded Talent Interactive · ${esc(geoLabel)} · ${esc(sector)} · Page 2 / 3</div>
       </div>
 
       <!-- PAGE 3: Pathways and recommendations -->
@@ -737,10 +783,10 @@ const Dashboard = () => {
         <div class="header"><div>
           <p class="phase">Phase II · Recommended Pathways</p>
           <h1>${targetOccupation ? esc(targetOccupation) : 'Pathway destinations'}</h1>
-        </div><div class="meta">Pathway mode: ${esc(pathwayMode === 'transitions' ? 'Observed transitions' : 'Skill similarity')}</div></div>
+        </div><div class="meta">Pathway mode: ${esc(pathwayMode === 'transitions' && !isTransitionFallback ? 'Observed transitions' : pathwayMode === 'transitions' ? 'Skill similarity (no observed transitions for this occupation)' : 'Skill similarity')}</div></div>
 
         ${targetOccupation ? `<p class="narrative">
-          Career pathway analysis for <strong>${esc(targetOccupation)}</strong> in ${esc(geoLabel)}. Destinations below combine BGI-observed transition flows with high-similarity skill matches; each is shown with its wage gain, similarity rating, and AI exposure profile so policymakers can pick durable pathways.
+          Career pathway analysis for <strong>${esc(targetOccupation)}</strong> in ${esc(geoLabel)}. Destinations below are ranked by ${pathwayMode === 'transitions' && !isTransitionFallback ? 'observed career transitions' : 'skill similarity'}; each is shown with its wage gain, similarity rating, and 5-year AI demand outlook so policymakers can pick durable pathways.
         </p>` : '<p class="narrative">No focus occupation selected. Choose an occupation in the dashboard to generate a tailored pathway page.</p>'}
 
         ${topPathways.map((p, i) => {
@@ -754,7 +800,7 @@ const Dashboard = () => {
             <p class="rec-title">${esc(p.name)}</p>
             <div class="rec-row">
               <span><strong style="color: #fef3c7;">Wage gain:</strong> ${formatWageGain(wg)} (${formatWageGainPct(wgp * 100)})</span>
-              <span><strong style="color: #fef3c7;">Strandedness change:</strong> ${Math.round(ds * 100)}%</span>
+              <span><strong style="color: #fef3c7;">Strandedness change:</strong> ${Math.round(ds * 100) > 0 ? '+' : ''}${Math.round(ds * 100)} pts</span>
               <span><strong style="color: #fef3c7;">TN demand:</strong> ${esc(p.demand_category || 'N/A')}</span>
               ${sDest.band !== 'none' && sDest.impactPct !== null ? `<span class="rec-pill" style="background: ${bandHex(sDest.band)}; color: white;">${bandShort(sDest.band)} · ${sDest.impactPct >= 0 ? '+' : ''}${sDest.impactPct.toFixed(0)}% 5yr</span>` : ''}
               ${(intP !== undefined && intP !== null) ? `<span class="rec-pill">Internal promo ${Math.round(intP * 100)}%</span>` : ''}
@@ -764,20 +810,25 @@ const Dashboard = () => {
 
         <h2 style="margin-top: 22px;">Strategic implications</h2>
         <ul class="recs-list">
-          ${strandedPct >= 25 ? `<li><strong>Sector triage.</strong> ${esc(sector)} in ${esc(geoLabel)} runs above the statewide ~25% strandedness baseline. Prioritise this intersection for credential-pathway investment.</li>` : `<li><strong>Below-baseline slice.</strong> ${esc(sector)} in ${esc(geoLabel)} sits at ${strandedPct.toFixed(0)}% strandedness, below the statewide baseline — interventions should focus on the specific stranded subpopulations identified on page 2 rather than blanket sector treatments.</li>`}
-          ${highRiskShare >= 30 ? `<li><strong>Double-jeopardy concentration.</strong> ${highRiskShare}% of stranded workers in this slice sit in high net displacement-risk occupations — meaning automation outweighs augmentation by 10+ percentage points. Pathway choices that route into low-risk destinations (healthcare ladder, professional/financial services) compound returns: immediate strandedness relief plus durable insulation from disruption.</li>` : `<li><strong>Manageable displacement risk.</strong> Only ${highRiskShare}% of stranded workers in this slice sit in high net displacement-risk occupations — most face AI as a tool that augments rather than replaces. Strandedness here is more a pay/utilisation question than an AI-disruption question.</li>`}
+          ${strandedPct === null ? `<li><strong>Rate not comparable.</strong> The ACS survey sample cannot serve as a denominator for ${esc(sector)} in ${esc(geoLabel)}, so this slice's strandedness rate is not comparable to the statewide baseline. The worker counts above are measured; target interventions using the occupation-level composition on page 2.</li>` : strandedPct >= 25 ? `<li><strong>Sector triage.</strong> ${esc(sector)} in ${esc(geoLabel)} runs above the statewide ~25% baseline for low-wage and underemployed workers (the career-stalled cohort shown here adds further to the local total). Prioritize this intersection for credential-pathway investment.</li>` : `<li><strong>Below-baseline slice.</strong> ${esc(sector)} in ${esc(geoLabel)} sits at ${strandedPct.toFixed(1)}% strandedness, below the statewide ~25% low-wage-plus-underemployed baseline — interventions should focus on the specific stranded subpopulations identified on page 2 rather than blanket sector treatments.</li>`}
+          ${highRiskShare >= 30 ? `<li><strong>Double-jeopardy concentration.</strong> ${highRiskShare}% of this slice's stranded workers are in occupations where BGI projects a 5%+ decline in employer demand over the next five years. Pathway choices that route into stable destinations (healthcare ladder, professional/financial services) compound returns: immediate strandedness relief plus durable insulation from disruption.</li>` : `<li><strong>Manageable displacement risk.</strong> Only ${highRiskShare}% of this slice's stranded workers are in occupations where BGI projects a 5%+ demand decline over the next five years — for most, AI is on track to augment rather than replace. Strandedness here is more a pay/utilization question than an AI-disruption question.</li>`}
           <li><strong>Pathway architecture.</strong> The report identifies seven destranding pathway types. For this slice, the most relevant typically include the Healthcare Ladder (highest wage gain, lowest AI exposure), Professional & Financial Services (highest strandedness reduction), and Project & Operations Management (most credential-accessible, sector-agnostic).</li>
-          <li><strong>Within-occupation lever.</strong> Promotion-rate and full-time-share data on page 2 indicate that, for some occupations, scaling part-time hours up to full-time and supporting internal promotion are credible alternatives to a full pathway switch. These are lower-cost interventions.</li>
+          <li><strong>Within-occupation lever.</strong> Promotion-rate and full-time-share data in the dashboard's occupation diagnostics indicate that, for some occupations, scaling part-time hours up to full-time and supporting internal promotion are credible alternatives to a full pathway switch. These are lower-cost interventions.</li>
         </ul>
 
-        <div class="footer">Tennessee BGI Strategic Workforce Initiative · ${esc(geoLabel)} · ${esc(sector)} · Page 3 / 3</div>
+        <div class="footer">Burning Glass Institute · Stranded Talent Interactive · ${esc(geoLabel)} · ${esc(sector)} · Page 3 / 3</div>
       </div>
 
       <script>setTimeout(function(){ window.print(); }, 600);</script></body></html>`;
 
     const win = window.open('', '_blank');
-    win?.document.write(reportHtml);
-    win?.document.close();
+    if (!win) {
+      // Popup blocked — without this the click silently does nothing.
+      window.alert('The Executive Brief opens in a new tab, which your browser blocked. Allow pop-ups for this site and try again.');
+      return;
+    }
+    win.document.write(reportHtml);
+    win.document.close();
   };
 
   // ============================================================================
@@ -785,24 +836,34 @@ const Dashboard = () => {
   // ============================================================================
 
   const treemapTotal = stats.lw + stats.ue + stats.st;
+  // A cohort's SHARE is only meaningful when every cohort in the denominator was
+  // measured. Without an ACS sample the low-wage and underemployed legs read 0 and
+  // the stalled leg alone claims 100% of a total it does not actually own, so the
+  // whole mix falls back to a dash rather than three misleading percentages.
+  const cohortMixKnown = stats.hasAcs && treemapTotal > 0;
+  // The rate mixes sources: lw/ue/total are ACS, st is Profiles/OEWS. Where the ACS
+  // badly under-covers a sector the ratio can exceed 100% — meaningless, so treat it
+  // like the no-sample case rather than printing an impossible percentage.
+  const rateKnown = stats.total > 0 && treemapTotal <= stats.total;
+  const stranded_rate = rateKnown ? (treemapTotal / stats.total) * 100 : null;
   const treemapItems: { key: CohortType; label: string; value: number; pct: number | null; color: string; selectedColor: string; textColor: string; tooltip: string }[] = [
     {
       key: 'Low Wage', label: 'Low Wage', value: stats.lw,
-      pct: treemapTotal > 0 ? (stats.lw / treemapTotal) * 100 : null,
+      pct: cohortMixKnown ? (stats.lw / treemapTotal) * 100 : null,
       color: 'bg-blue-100 border-blue-200', selectedColor: 'bg-blue-600 border-blue-700',
-      textColor: 'text-blue-900', tooltip: 'Workers earning annual wages below $30,493 (two-thirds of MIT Living Wage for Tennessee). These workers struggle to meet basic living expenses despite being employed.'
+      textColor: 'text-blue-900', tooltip: 'Workers earning under $30,493 a year — two-thirds of the MIT Living Wage for a single adult in Tennessee. Employed, but pay does not cover a basic cost of living.'
     },
     {
       key: 'Underemployed', label: 'Underemployed', value: stats.ue,
-      pct: treemapTotal > 0 ? (stats.ue / treemapTotal) * 100 : null,
+      pct: cohortMixKnown ? (stats.ue / treemapTotal) * 100 : null,
       color: 'bg-amber-100 border-amber-200', selectedColor: 'bg-amber-500 border-amber-600',
-      textColor: 'text-amber-900', tooltip: 'Workers whose education exceeds their job requirements by 2+ levels (Associate\'s or below) or 1+ level (Bachelor\'s or above), AND earning $45,739 or less annually.'
+      textColor: 'text-amber-900', tooltip: 'Workers whose education exceeds their job\'s requirements by 2+ levels (Associate\'s or below) or 1+ level (Bachelor\'s or above), earning $45,739 or less. Workers who are also low-wage are counted under Low Wage.'
     },
     {
       key: 'Stalled', label: 'Career Stalled', value: Math.round(stats.st),
-      pct: treemapTotal > 0 ? (stats.st / treemapTotal) * 100 : null,
+      pct: cohortMixKnown ? (stats.st / treemapTotal) * 100 : null,
       color: 'bg-emerald-100 border-emerald-200', selectedColor: 'bg-emerald-500 border-emerald-600',
-      textColor: 'text-emerald-900', tooltip: 'Workers who have remained in the same low-wage job for 3+ years without meaningful wage progression. Economically stuck — employed but unable to advance.'
+      textColor: 'text-emerald-900', tooltip: 'Workers in the same job for 3+ years with no inflation-adjusted wage growth, still earning under about $46,000. Employed but not advancing. Workers who are also low-wage or underemployed are counted in those cohorts instead.'
     },
   ];
 
@@ -825,7 +886,7 @@ const Dashboard = () => {
           {/* Report download is gated on VITE_REPORT_DOCX (built into the public site only once the
               .docx is cleared for public release + committed alongside it). Hidden by default. */}
           {(import.meta as any).env?.VITE_REPORT_DOCX === '1' && (
-          <a href={`${(import.meta as any).env?.BASE_URL || '/'}Mobilizing-Stranded-Talent-Report.docx`} download
+          <a href={`${BASE_URL}Mobilizing-Stranded-Talent-Report.docx`} download
             className="flex items-center gap-2 md:gap-3 bg-amber-500 hover:bg-amber-400 text-blue-950 px-4 py-2 md:px-6 md:py-3 rounded-2xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 group flex-1 md:flex-none justify-center"
             title="Download the full 'Mobilizing Stranded Talent' research report (Word document)">
             <FileText size={16} className="md:w-[18px] md:h-[18px] group-hover:translate-y-0.5 transition-transform" />
@@ -886,7 +947,7 @@ const Dashboard = () => {
                 </div>
                 <div className="lg:col-span-3 p-5 bg-amber-500 rounded-[20px] text-blue-950 flex flex-col justify-center">
                   <p className="text-[10px] font-black text-blue-950/40 uppercase tracking-widest mb-1">Stranded Rate</p>
-                  <p className="text-2xl md:text-3xl font-black">{stats.total > 0 ? `${(((stats.lw + stats.ue + stats.st) / stats.total) * 100).toFixed(0)}%` : '—'}</p>
+                  <p className="text-2xl md:text-3xl font-black">{stranded_rate !== null ? `${stranded_rate.toFixed(1)}%` : '—'}</p>
                 </div>
               </div>
             </div>
@@ -948,7 +1009,7 @@ const Dashboard = () => {
 
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">{item.label}</span>
-                        {item.pct !== null && <span className="text-[10px] font-bold text-slate-400">{item.pct.toFixed(0)}%</span>}
+                        <span className="text-[10px] font-bold text-slate-400">{item.pct !== null ? `${item.pct.toFixed(0)}%` : '—'}</span>
                       </div>
                       <div className="flex items-baseline justify-between mb-2">
                         <span className="text-xl md:text-2xl font-black text-slate-800 tabular-nums">{Math.round(item.value).toLocaleString()}</span>
@@ -969,16 +1030,38 @@ const Dashboard = () => {
               })()}
             </div>
             <div className="mt-3 flex items-center justify-between">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Share of sector workforce</p>
+              {/* The tile %s are shares OF THE STRANDED TOTAL, not of the workforce —
+                  the caption must say which. The workforce share is the right stat. */}
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Cohort share of all stranded</p>
+              {/* Three states, not two: a rate, an unmeasurable rate (ACS sample
+                  missing or too thin to serve as denominator, though Profiles still
+                  counts stalled workers here), and a genuinely empty selection. */}
               <p className="text-[10px] font-black text-slate-600">
-                {stats.total > 0 ? `${(((stats.lw + stats.ue + stats.st) / stats.total) * 100).toFixed(1)}% stranded` : 'No workers in this selection'}
+                {stranded_rate !== null
+                  ? `${stranded_rate.toFixed(1)}% of sector workforce stranded`
+                  : treemapTotal > 0
+                    ? `Rate unavailable — ${stats.total > 0 ? 'the ACS sample here is too thin to serve as a denominator' : 'no ACS survey sample for this selection'}${slice?.stats.oews_employment ? ` (${Math.round(slice.stats.oews_employment).toLocaleString()} OEWS jobs)` : ''}`
+                    : 'No workers in this selection'}
               </p>
             </div>
           </div>
 
           {/* Diagnostics panel — full-width below, 3 columns inside */}
           <div className="bg-white p-6 md:p-10 rounded-[24px] md:rounded-[40px] shadow-sm border border-slate-200">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-5 md:mb-6">Diagnostics: {selectedCohort}</h4>
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-5 md:mb-6">Diagnostics: {cohortDisplay(selectedCohort)}</h4>
+
+            {/* The stalled counts below are real (Profiles records projected onto OEWS
+                employment); it is the ACS survey denominator that is missing, which is
+                why the low-wage and underemployed cohorts read zero and no rate or age
+                / education breakdown can be shown. */}
+            {!stats.hasAcs && treemapTotal > 0 && (
+              <p className="-mt-3 mb-6 text-[11px] leading-relaxed text-slate-500 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                No ACS survey sample falls in {geography === 'All' ? 'this selection' : `${geoDisplay(geography)} / ${sector}`},
+                so low-wage and underemployed counts, the stranded rate, and the age and education
+                breakdowns are unavailable here. The career-stalled figures come from Profiles
+                records calibrated to OEWS employment and are measured independently.
+              </p>
+            )}
 
             {selectedCohort === 'Stalled' ? (
               // Stalled: occupational mix + stall duration histogram
@@ -996,6 +1079,15 @@ const Dashboard = () => {
                         ))
                       : <p className="text-xs text-slate-400 italic">No workers in this selection.</p>}
                   </div>
+                  {/* A short list is data, not a broken panel: occupations rounding to
+                      fewer than one worker are dropped rather than drawn as "0" bars. */}
+                  {stalledBreakdowns.occMix.length > 0 && stalledBreakdowns.occMix.length < 8 && (
+                    <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
+                      Only {stalledBreakdowns.occMix.length}{' '}
+                      {stalledBreakdowns.occMix.length === 1 ? 'occupation rounds' : 'occupations round'} to
+                      at least one stalled worker in this selection.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
@@ -1028,20 +1120,38 @@ const Dashboard = () => {
                             ));
                           })()}
                   </div>
-                  {stalledBreakdowns.stalledCount > 0 && !stalledBreakdowns.durationSuppressed
-                    && stalledBreakdowns.durationBasis !== 'cell' && (
+                  {/* Shown for EVERY resolved panel, not just borrowed ones. A panel
+                      standing on its own thin cell is no better evidenced than one that
+                      borrows — the reviewer's three identical 149s came from a cell with
+                      16 spells tied 3/3/3, carrying no borrowed-shape badge at all. The
+                      spell count is what tells a reader the real resolution. */}
+                  {stalledBreakdowns.stalledCount > 0 && !stalledBreakdowns.durationSuppressed && (
                     <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
                       Measuring how <em>long</em> a stall lasts needs workers observed both
                       entering and leaving one, which is far rarer than being in a stall.
-                      Only {stalledBreakdowns.durationCellNObs.toLocaleString()} such completed
-                      {stalledBreakdowns.durationCellNObs === 1 ? ' spell falls' : ' spells fall'} in
-                      {' '}{geography === 'All' ? 'this selection' : `${geography} / ${sector}`},
-                      below the threshold of {meta.thresholds.min_stall_duration_sample}, so the
-                      shape above is the{' '}
-                      {stalledBreakdowns.durationBasis === 'sector' ? `${sector} pattern across Tennessee` : 'Tennessee-wide pattern'}
-                      {' '}({stalledBreakdowns.durationNObs?.toLocaleString()} spells) applied to this
-                      selection&rsquo;s {Math.round(stalledBreakdowns.stalledCount).toLocaleString()} stalled
-                      workers. The count is measured; the split across years is indicative.
+                      {stalledBreakdowns.durationBasis === 'cell' ? (
+                        <>
+                          {' '}The split above rests on the{' '}
+                          {stalledBreakdowns.durationCellNObs.toLocaleString()} completed
+                          {stalledBreakdowns.durationCellNObs === 1 ? ' spell' : ' spells'} observed in
+                          {' '}{geography === 'All' ? 'this selection' : `${geoDisplay(geography)} / ${sector}`},
+                          spread across this selection&rsquo;s{' '}
+                          {Math.round(stalledBreakdowns.stalledCount).toLocaleString()} stalled workers.
+                        </>
+                      ) : (
+                        <>
+                          {' '}Only {stalledBreakdowns.durationCellNObs.toLocaleString()} such completed
+                          {stalledBreakdowns.durationCellNObs === 1 ? ' spell falls' : ' spells fall'} in
+                          {' '}{geography === 'All' ? 'this selection' : `${geoDisplay(geography)} / ${sector}`},
+                          below the threshold of {meta.thresholds.min_stall_duration_sample}, so the
+                          shape above is the{' '}
+                          {stalledBreakdowns.durationBasis === 'sector' ? `${sector} pattern across Tennessee` : 'Tennessee-wide pattern'}
+                          {stalledBreakdowns.durationNObs != null && <>{' '}({stalledBreakdowns.durationNObs.toLocaleString()} spells)</>} applied to this
+                          selection&rsquo;s {Math.round(stalledBreakdowns.stalledCount).toLocaleString()} stalled
+                          workers.
+                        </>
+                      )}
+                      {' '}The count is measured; the split across years is indicative.
                     </p>
                   )}
                 </div>
@@ -1062,6 +1172,13 @@ const Dashboard = () => {
                         ))
                       : <p className="text-xs text-slate-400 italic">No workers in this selection.</p>}
                   </div>
+                  {cohortBreakdowns.occ.length > 0 && cohortBreakdowns.occ.length < 8 && (
+                    <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
+                      Only {cohortBreakdowns.occ.length}{' '}
+                      {cohortBreakdowns.occ.length === 1 ? 'occupation rounds' : 'occupations round'} to
+                      at least one worker in this cohort in this selection.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
@@ -1114,7 +1231,7 @@ const Dashboard = () => {
             {cohortBreakdowns.occ.length === 0 ? (
               <div className="text-center py-8 md:py-10">
                 <p className="text-sm font-black text-slate-500 uppercase tracking-widest">No occupation data for this slice</p>
-                <p className="text-xs text-slate-400 mt-2 max-w-md mx-auto">The crosstab does not contain workers for <span className="font-bold text-slate-600">{geography === 'All' ? 'Tennessee' : geoDisplay(geography)}</span> · <span className="font-bold text-slate-600">{sector}</span>. Pick a different geography or sector to continue.</p>
+                <p className="text-xs text-slate-400 mt-2 max-w-md mx-auto">No {cohortDisplay(selectedCohort).toLowerCase()} workers are recorded for <span className="font-bold text-slate-600">{geography === 'All' ? 'Tennessee' : geoDisplay(geography)}</span> · <span className="font-bold text-slate-600">{sector}</span>. Pick a different cohort, geography, or sector to continue.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
@@ -1128,7 +1245,7 @@ const Dashboard = () => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest ${targetOccupation === occ ? 'text-blue-400' : 'text-slate-400'}`}>
-                        {selectedCohort === 'All Stranded' ? 'Stranded Workers' : `${selectedCohort} Workers`}
+                        {selectedCohort === 'All Stranded' ? 'Stranded Workers' : `${cohortDisplay(selectedCohort)} Workers`}
                       </span>
                       <span className={`text-base md:text-lg font-black ${targetOccupation === occ ? 'text-white' : 'text-blue-950'}`}>{Math.round(val).toLocaleString()}</span>
                     </div>
@@ -1146,17 +1263,17 @@ const Dashboard = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
                   <div className="p-4 md:p-6 bg-slate-50 rounded-[20px] md:rounded-[24px] border border-slate-100">
                     <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Stranded Share</p>
-                    <p className="text-xl md:text-2xl font-black text-blue-900">{(occupationDiagnostics.strandedShare * 100).toFixed(1)}%</p>
+                    <p className="text-xl md:text-2xl font-black text-blue-900">{occupationDiagnostics.strandedShare !== null ? `${(occupationDiagnostics.strandedShare * 100).toFixed(1)}%` : '—'}</p>
                     <p className="text-[9px] text-slate-400 mt-1">of workers in this occupation are stranded</p>
                   </div>
                   <div className="p-4 md:p-6 bg-slate-50 rounded-[20px] md:rounded-[24px] border border-slate-100">
                     <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Median Wage</p>
-                    <p className="text-xl md:text-2xl font-black text-blue-900">${occupationDiagnostics.medianWage.toLocaleString()}</p>
+                    <p className="text-xl md:text-2xl font-black text-blue-900">{occupationDiagnostics.medianWage !== null ? `$${occupationDiagnostics.medianWage.toLocaleString()}` : '—'}</p>
                     <p className="text-[9px] text-slate-400 mt-1">annual median for this occupation</p>
                   </div>
                   <div className="p-4 md:p-6 bg-slate-50 rounded-[20px] md:rounded-[24px] border border-slate-100 group relative">
                     <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Part-Time Share</p>
-                    <p className="text-xl md:text-2xl font-black text-blue-900">{(occupationDiagnostics.partTimeShare * 100).toFixed(1)}%</p>
+                    <p className="text-xl md:text-2xl font-black text-blue-900">{occupationDiagnostics.partTimeShare !== null ? `${(occupationDiagnostics.partTimeShare * 100).toFixed(1)}%` : '—'}</p>
                     <p className="text-[9px] text-slate-400 mt-1">working part-time in this occupation</p>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56 text-center z-50 shadow-lg">
                       Share of workers working part-time, among those working at least 15 hours per week.
@@ -1198,7 +1315,7 @@ const Dashboard = () => {
                           <p className="text-sm italic mt-1">No AI projection data.</p>
                         )}
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-72 text-center z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
-                          BGI's demand-adjusted 5-year projection: how employer need for this occupation is expected to shift, after accounting for AI adoption pace, demand elasticity, and physical-task constraints. Bands: High Risk ≤ −5%, Moderate Decline −5% to −2%, Stable &gt; −2% (±2% is treated as normal projection churn).
+                          BGI's demand-adjusted 5-year projection: how employer need for this occupation is expected to shift, after accounting for AI adoption pace, demand elasticity, and physical-task constraints. Bands: High Risk ≤ −5%, Soft Decline −5% to −2%, Stable &gt; −2% (±2% is treated as normal projection churn).
                         </div>
                       </div>
                     );
@@ -1244,7 +1361,7 @@ const Dashboard = () => {
               <div className="flex items-center gap-3 mb-4">
                 <ArrowRight size={16} className="text-amber-500 flex-shrink-0" />
                 <p className="text-[10px] md:text-[11px] font-black uppercase tracking-widest text-slate-500">
-                  {pathwayMode === 'transitions' && !isTransitionFallback ? 'Top Observed Transitions' : 'Most Skill-Similar Occupations'} for {pluralize(targetOccupation)}
+                  {pathwayMode === 'transitions' && !isTransitionFallback ? 'Top Observed Transitions' : 'Most Skill-Similar Occupations'} for {targetOccupation}
                 </p>
               </div>
               {isTransitionFallback && (
@@ -1292,14 +1409,14 @@ const Dashboard = () => {
                             </span>
                             {p.wage_imputed && (
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56 text-center z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
-                                Indicative, not measured. BLS publishes no separate Tennessee wage for one of these occupations, so it is estimated from the combined occupation group BLS does publish, from the national wage rescaled to Tennessee within the same occupation group, or — where BLS publishes no wage at any grain — from the median wage Tennessee workers report in the American Community Survey.
+                                Estimate, not a measured Tennessee wage. BLS publishes no separate TN figure for one of these occupations, so it is filled from the nearest published one: the combined occupation group, the national wage scaled to Tennessee, or the wage TN workers report in the American Community Survey.
                               </div>
                             )}
                           </div>
                           <div className="flex items-center justify-between">
                             <span className={`text-[8px] md:text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>Strandedness</span>
-                            <span className={`text-[11px] md:text-xs font-black ${strandPct < 0 ? (isSelected ? 'text-emerald-300' : 'text-emerald-600') : (isSelected ? 'text-red-300' : 'text-red-500')}`}>
-                              {strandPct < 0 ? `${strandPct}% points` : `+${strandPct}% points`}
+                            <span className={`text-[11px] md:text-xs font-black ${strandPct < 0 ? (isSelected ? 'text-emerald-300' : 'text-emerald-600') : strandPct === 0 ? (isSelected ? 'text-blue-200' : 'text-slate-500') : (isSelected ? 'text-red-300' : 'text-red-500')}`}>
+                              {strandPct === 0 ? '±0 pts' : strandPct < 0 ? `${strandPct} pts` : `+${strandPct} pts`}
                             </span>
                           </div>
                           {pathwayMode === 'transitions' && (p.per_1000_switches || 0) > 0 && (
@@ -1333,7 +1450,7 @@ const Dashboard = () => {
                               <span className={`text-[8px] md:text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>AI Outlook</span>
                               <AIBadge auto={p.ai.auto_exposure} aug={p.ai.aug_exposure} impactPct={p.ai.impact_pct_baseline} isSelected={isSelected} />
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56 text-center z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
-                                BGI's demand-adjusted 5-year projection of the change in employer demand for the destination occupation, accounting for AI adoption pace, demand elasticity, and physical-task constraints. Decline ≤ −5%, Soft decline −5% to −2%, Stable &gt; −2% (±2% is treated as normal projection churn).
+                                BGI's demand-adjusted 5-year projection of the change in employer demand for the destination occupation, accounting for AI adoption pace, demand elasticity, and physical-task constraints. High Risk ≤ −5%, Soft Decline −5% to −2%, Stable &gt; −2% (±2% is treated as normal projection churn).
                               </div>
                             </div>
                           )}
@@ -1418,7 +1535,7 @@ const Dashboard = () => {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-400 italic">{skills ? 'No skill gap data available for this transition.' : 'Loading skill data…'}</p>
+                        <p className="text-sm text-slate-400 italic">{skills ? 'No skill gap data available for this transition.' : skillsError ? 'Skill data failed to load — check your connection and reselect the destination to retry.' : 'Loading skill data…'}</p>
                       )}
                     </div>
                   )}
@@ -1506,7 +1623,7 @@ const Dashboard = () => {
                             {!hasStatutory && !hasCommon && credentialSkills.length === 0 && (
                               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                 <p className="text-sm text-slate-600 font-medium">No Tennessee state license or specific credential requirements were identified for {selectedDestination}.</p>
-                                <p className="text-xs text-slate-400 mt-2">This occupation does not appear in the Knee Center's Tennessee occupational licensing database, and no common industry credentials were identified. We recommend checking industry certification bodies for voluntary credentials that may improve employability.</p>
+                                <p className="text-xs text-slate-400 mt-2">This occupation does not appear in the Knee Center's Tennessee occupational licensing database, and no common industry credentials were identified. Check industry certification bodies for voluntary credentials.</p>
                               </div>
                             )}
 
@@ -1534,7 +1651,10 @@ const Dashboard = () => {
                   {expandedRec === 2 && (
                     <div className="mt-6 md:mt-8" onClick={e => e.stopPropagation()}>
                       {occupationDiagnostics && (() => {
-                        const ptShare = occupationDiagnostics.partTimeShare || 0;
+                        // partTimeShare null means UNMEASURED — treating it as 0 asserted
+                        // "100% are already full-time" for occupations with no hours data.
+                        const hasHours = occupationDiagnostics.partTimeShare !== null;
+                        const ptShare = occupationDiagnostics.partTimeShare ?? 0;
                         const ftShare = 1 - ptShare;
                         const intP = occupationDiagnostics.internalPromo5;
                         const extP = occupationDiagnostics.externalPromo5;
@@ -1543,8 +1663,8 @@ const Dashboard = () => {
                         const hasPromo = hasIntP || hasExtP;
                         const totalPromo = (intP || 0) + (extP || 0);
 
-                        const HOURS_VIABLE = ptShare >= 0.15;
-                        const HOURS_PARTIAL = ptShare >= 0.07 && ptShare < 0.15;
+                        const HOURS_VIABLE = hasHours && ptShare >= 0.15;
+                        const HOURS_PARTIAL = hasHours && ptShare >= 0.07 && ptShare < 0.15;
                         const PROMO_STRONG = hasPromo && totalPromo >= 0.20;
                         const PROMO_MODERATE = hasPromo && totalPromo >= 0.10 && totalPromo < 0.20;
 
@@ -1556,19 +1676,19 @@ const Dashboard = () => {
                             return <>The primary within-occupation lever here is <strong>scaling part-time hours up to full-time</strong> — {(ptShare * 100).toFixed(0)}% of workers are part-time, a meaningful cohort. Promotion data is {hasPromo ? 'limited' : 'unavailable'} for this occupation, so in-role advancement is a weaker bet.</>;
                           }
                           if (PROMO_STRONG || PROMO_MODERATE) {
-                            return <>Most workers in this occupation are already full-time, so hours scale-up isn't a meaningful lever. <strong>In-role advancement</strong> via promotion or employer switching is the live within-occupation path: roughly {(totalPromo * 100).toFixed(0)}% see a meaningful advance within five years.</>;
+                            return <>{hasHours ? 'Most workers in this occupation are already full-time, so hours scale-up isn’t a meaningful lever.' : 'Hours data is unavailable for this occupation.'} <strong>In-role advancement</strong> via promotion or employer switching is the live within-occupation path: roughly {(totalPromo * 100).toFixed(0)}% see a meaningful advance within five years.</>;
                           }
                           if (HOURS_PARTIAL) {
                             return <>Within-occupation levers are limited for this role: only {(ptShare * 100).toFixed(0)}% are part-time (modest hours scale-up potential), and promotion data is {hasPromo ? 'thin' : 'unavailable'}. A cross-occupation pathway is likely the stronger move for stranded workers here.</>;
                           }
-                          return <>Within-occupation mobility is a weak lever for this role: <strong>{(ftShare * 100).toFixed(0)}% are already full-time</strong> (so hours scale-up doesn't apply), and {hasPromo ? `5-year promotion + job-move rates total only ${(totalPromo * 100).toFixed(0)}%` : 'promotion data is unavailable'}. For these workers, a cross-occupation pathway is likely the stronger move.</>;
+                          return <>Within-occupation mobility is a weak lever for this role: {hasHours ? <><strong>{(ftShare * 100).toFixed(0)}% are already full-time</strong> (so hours scale-up doesn't apply), and </> : <>hours data is unavailable, and </>}{hasPromo ? `5-year promotion + job-move rates total only ${(totalPromo * 100).toFixed(0)}%` : 'promotion data is unavailable'}. For these workers, a cross-occupation pathway is likely the stronger move.</>;
                         })();
 
                         return (
                           <div className="space-y-4">
                             <div className="p-5 bg-blue-50 rounded-2xl border border-blue-100">
                               <p className="text-sm md:text-base text-slate-700 leading-relaxed font-medium">
-                                Stranded is not a universal condition of this occupation &mdash; <span className="font-black text-blue-900">{((1 - occupationDiagnostics.strandedShare) * 100).toFixed(1)}%</span> of {pluralize(targetOccupation)} are not stranded. {leverDescription}
+                                {occupationDiagnostics.strandedShare !== null && <>Stranded is not a universal condition of this occupation &mdash; <span className="font-black text-blue-900">{((1 - occupationDiagnostics.strandedShare) * 100).toFixed(1)}%</span> of workers in {targetOccupation} roles are not stranded. </>}{leverDescription}
                               </p>
                             </div>
 
@@ -1576,18 +1696,20 @@ const Dashboard = () => {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                               <div className="p-4 bg-white rounded-2xl border border-slate-100">
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Non-Stranded Rate</p>
-                                <p className="text-lg md:text-xl font-black text-blue-900">{((1 - occupationDiagnostics.strandedShare) * 100).toFixed(1)}%</p>
-                                <p className="text-[9px] text-slate-400 mt-1">share with adequate pay &amp; utilisation</p>
+                                <p className="text-lg md:text-xl font-black text-blue-900">{occupationDiagnostics.strandedShare !== null ? `${((1 - occupationDiagnostics.strandedShare) * 100).toFixed(1)}%` : '—'}</p>
+                                <p className="text-[9px] text-slate-400 mt-1">share with adequate pay &amp; utilization</p>
                               </div>
                               <div className={`p-4 rounded-2xl border ${HOURS_VIABLE ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100'}`}>
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Full-Time Share</p>
-                                <p className="text-lg md:text-xl font-black text-blue-900">{(ftShare * 100).toFixed(1)}%</p>
+                                <p className="text-lg md:text-xl font-black text-blue-900">{hasHours ? `${(ftShare * 100).toFixed(1)}%` : '—'}</p>
                                 <p className="text-[9px] mt-1 text-slate-500">
-                                  {HOURS_VIABLE
-                                    ? <><span className="font-black text-amber-700">{(ptShare * 100).toFixed(1)}% PT</span> — hours scale-up is a real lever</>
-                                    : HOURS_PARTIAL
-                                      ? <>{(ptShare * 100).toFixed(1)}% PT — modest scale-up potential</>
-                                      : <>{(ptShare * 100).toFixed(1)}% PT — too few to make scale-up a meaningful lever</>}
+                                  {!hasHours
+                                    ? <>hours data unavailable for this occupation</>
+                                    : HOURS_VIABLE
+                                      ? <><span className="font-black text-amber-700">{(ptShare * 100).toFixed(1)}% PT</span> — hours scale-up is a real lever</>
+                                      : HOURS_PARTIAL
+                                        ? <>{(ptShare * 100).toFixed(1)}% PT — modest scale-up potential</>
+                                        : <>{(ptShare * 100).toFixed(1)}% PT — too few to make scale-up a meaningful lever</>}
                                 </p>
                               </div>
                               <div className="p-4 rounded-2xl border group relative bg-white border-slate-100">
@@ -1603,7 +1725,7 @@ const Dashboard = () => {
                                 <p className="text-lg md:text-xl font-black text-blue-900">{hasExtP ? `${(extP! * 100).toFixed(1)}%` : '—'}</p>
                                 <p className="text-[9px] text-slate-500 mt-1">advanced via switching employer in 5 yrs</p>
                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56 text-center z-50 shadow-lg leading-relaxed">
-                                  Share of workers in this occupation who advanced to a higher-paying role by switching to a different employer within 5 years.
+                                  Share of workers in this occupation who advanced to a higher-paying role by switching to a different employer within 5 years (national).
                                 </div>
                               </div>
                             </div>
@@ -1628,7 +1750,7 @@ const Dashboard = () => {
                   {expandedRec === 3 && (
                     <div className="mt-6 md:mt-8" onClick={e => e.stopPropagation()}>
                       <p className="text-sm text-slate-600 font-medium mb-4">
-                        Skills that appear as gaps across multiple destination pathways for {pluralize(targetOccupation)}. Investing in these skills maximizes career flexibility.
+                        Skills that appear as gaps across multiple destination pathways for {targetOccupation}. Investing in these skills maximizes career flexibility.
                       </p>
                       {crossPathwaySkills.length > 0 ? (
                         <div className="space-y-3">
@@ -1646,7 +1768,7 @@ const Dashboard = () => {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-400 italic">{skills ? 'No cross-pathway skill data available for this occupation.' : 'Loading skill data…'}</p>
+                        <p className="text-sm text-slate-400 italic">{skills ? 'No cross-pathway skill data available for this occupation.' : skillsError ? 'Skill data failed to load — check your connection and reselect the destination to retry.' : 'Loading skill data…'}</p>
                       )}
                     </div>
                   )}
@@ -1660,11 +1782,11 @@ const Dashboard = () => {
                     <h3 className="text-xl md:text-2xl font-black leading-tight mb-6 md:mb-8 tracking-tighter uppercase text-amber-400">Target Group Profile</h3>
                     <div className="mb-6 md:mb-10 space-y-3 md:space-y-4">
                       {[
-                        ['Region', geography],
+                        ['Region', geography === 'All' ? 'All Tennessee' : geoDisplay(geography)],
                         ['Sector', sector],
                         ['Origin', targetOccupation],
                         ['Destination', selectedDestination],
-                        ['Cohort', selectedCohort],
+                        ['Cohort', cohortDisplay(selectedCohort)],
                       ].map(([label, value]) => (
                         <div key={label} className="flex justify-between border-b border-white/10 pb-2 md:pb-3">
                           <span className="text-blue-300 text-[9px] md:text-[10px] uppercase font-bold tracking-widest">{label}</span>
@@ -1685,7 +1807,7 @@ const Dashboard = () => {
                           </p>
                           <p className="text-[10px] text-blue-300 mt-1">
                             {Math.abs(Math.round((selectedDestRow.wage_gain_median_pct ?? 0) * 100))}%{' '}
-                            {(selectedDestRow.wage_gain_median ?? 0) < 0 ? 'decrease' : 'increase'} &bull; To ${(selectedDestRow.wage_median_destination ?? 0).toLocaleString()}/yr
+                            {(selectedDestRow.wage_gain_median ?? 0) < 0 ? 'decrease' : 'increase'}{selectedDestRow.wage_median_destination != null && <> &bull; To ${selectedDestRow.wage_median_destination.toLocaleString()}/yr</>}
                           </p>
                         </div>
                       </div>
@@ -1696,7 +1818,7 @@ const Dashboard = () => {
                         <div>
                           <p className="text-[10px] md:text-[11px] font-bold uppercase text-blue-300 tracking-widest mb-1 md:mb-2">Strandedness Change</p>
                           <p className={`text-2xl md:text-3xl font-black ${(selectedDestRow.diff_strandedness ?? 0) < 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {Math.round((selectedDestRow.diff_strandedness ?? 0) * 100)}%<span className="text-lg"> points</span>
+                            {Math.round((selectedDestRow.diff_strandedness ?? 0) * 100) > 0 ? '+' : ''}{Math.round((selectedDestRow.diff_strandedness ?? 0) * 100)}<span className="text-lg"> pts</span>
                           </p>
                           <p className="text-[10px] text-blue-300 mt-1">
                             Destination stranded rate: {((selectedDestRow.share_stranded_destination ?? 0) * 100).toFixed(1)}%
@@ -1780,12 +1902,95 @@ const Dashboard = () => {
       </main>
 
       <footer className="max-w-7xl mx-auto px-4 md:px-10 py-8 md:py-16 border-t border-slate-200 text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-center flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0">
-        <span className="text-center md:text-left">BGI Data Analytics &copy; 2026 | Tennessee Strategic Workforce Dashboard</span>
+        <span className="text-center md:text-left">Burning Glass Institute &copy; 2026 | Stranded Talent Interactive</span>
         <div className="flex gap-6 md:gap-10">
-          <a href="#" className="hover:text-blue-600">Methodology</a>
-          <a href="#" className="hover:text-blue-600">Source Data</a>
+          {/* Must go through BASE_URL: the public site is served from a repo
+              subpath, where a root-absolute href would 404. */}
+          <a href={`${BASE_URL}methodology.pdf`} target="_blank" rel="noopener noreferrer"
+            className="hover:text-blue-600">Methodology</a>
+          <button onClick={() => setShowSources(true)} className="hover:text-blue-600 uppercase tracking-widest">
+            Source Data
+          </button>
         </div>
       </footer>
+
+      {/* Sources & vintages, read straight off meta.json rather than a static asset,
+          so it can never fall out of step with the data actually being rendered. */}
+      {showSources && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog" aria-modal="true" aria-label="Source data and vintages"
+          onClick={() => setShowSources(false)}>
+          <div className="bg-white rounded-[24px] max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between rounded-t-[24px]">
+              <div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Source Data &amp; Vintages</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                  View store generated {meta.generated_at}
+                </p>
+              </div>
+              <button onClick={() => setShowSources(false)}
+                className="text-slate-400 hover:text-slate-700 text-2xl leading-none font-black px-2">&times;</button>
+            </div>
+
+            <div className="px-8 py-6 space-y-6 text-[12px] leading-relaxed text-slate-600 normal-case tracking-normal font-normal text-left">
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Career-stalled workers — Profiles Data</p>
+                {/* The calibrated-employment base is deliberately not printed here:
+                    its meta key collides with a microdata column name the bundle guard
+                    (scripts/check_bundle.mjs) forbids compiling into the app. */}
+                <p>
+                  Résumé histories calibrated to OEWS employment by occupation, industry and
+                  geography{meta.vintages.pdl_stall.run_date ? ` — run ${meta.vintages.pdl_stall.run_date}` : ''}
+                  {meta.vintages.pdl_stall.headline_stall_rate_pct !== null
+                    ? <>; statewide career-stall rate {meta.vintages.pdl_stall.headline_stall_rate_pct}%.</>
+                    : '.'}
+                </p>
+                <p className="mt-1 text-slate-400">{meta.vintages.pdl_stall.excluded_occupations}</p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Low-wage &amp; underemployed — ACS (IPUMS)</p>
+                <p>
+                  American Community Survey microdata. Low wage is annual earnings below{' '}
+                  ${meta.thresholds.low_wage.toLocaleString()} (two-thirds of the MIT Living Wage for
+                  Tennessee); underemployed requires education exceeding job requirements and earnings
+                  at or below ${meta.thresholds.underemployed_ceiling.toLocaleString()}.
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Stall duration</p>
+                <p>
+                  Duration needs workers observed entering <em>and</em> leaving a stall, so a panel
+                  resting on fewer than {meta.thresholds.min_stall_duration_sample} completed spells
+                  borrows its shape from the sector or the state. Bar heights are always the
+                  selection&rsquo;s own stalled count; each panel states what it rests on.
+                </p>
+              </div>
+
+              {meta.vintages.ai_exposure && (
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">AI exposure</p>
+                  <p>
+                    BGI AI-exposure model ({meta.vintages.ai_exposure.model_version}), {meta.vintages.ai_exposure.horizon}{' '}
+                    horizon, {meta.vintages.ai_exposure.scored?.toLocaleString()} occupations scored.
+                  </p>
+                  <p className="mt-1 text-slate-400">{meta.vintages.ai_exposure.employment_universe}</p>
+                </div>
+              )}
+
+              <div className="border-t border-slate-200 pt-5">
+                <p className="text-slate-400">
+                  Full derivation, assumptions and known limitations are in the{' '}
+                  <a href={`${BASE_URL}methodology.pdf`} target="_blank" rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline font-bold">methodology document</a>.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

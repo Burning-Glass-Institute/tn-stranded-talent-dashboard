@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-05 16:51:49",
-  "pub_date": "2026.08.05",
+  "generated_at": "2026-08-07 00:08:50",
+  "pub_date": "2026.08.07",
   "vintages": {
     "pdl_stall": {
       "run_date": "2026-07-15",
       "headline_stall_rate_pct": 9.67,
       "oews_calibrated_employment": 2845440,
-      "excluded_occupations": "Managers (SOC 11) and classroom teachers (SOC 251/252) excluded from the stall crosstab to match the ACS strandedness universe; the headline rate above is over the full workforce.",
+      "excluded_occupations": "Stalled counts exclude managers and classroom teachers to match the low-wage/underemployed universe; the statewide rate above covers the full workforce.",
       "source": "2026.03.31_stall_crosstab.csv"
     },
     "acs": {
@@ -23,7 +23,7 @@
       "scored": 505,
       "employment_base": "OEWS 2024 TN (area 47, detailed) apportioned to ACS-SOC5",
       "employment_total": 3265290,
-      "employment_universe": "ALL-TENNESSEE: every OEWS-published TN job, including the managers and classroom teachers the stall and ACS strandedness universes exclude. Larger base than those files -- do not cross-add AI headcounts with stranded or stalled counts.",
+      "employment_universe": "AI figures cover every Tennessee job published in OEWS, including the managers and classroom teachers excluded from the stranded and stalled universes, so AI worker counts are not additive with stranded or stalled counts.",
       "note": "abbe-v2.0 is NOT the model version behind the published report's AI figures. Check the impact_pct distribution against the dashboard's risk bands before publishing."
     }
   },
@@ -95,6 +95,6 @@
   "thresholds": {
     "low_wage": 30493,
     "underemployed_ceiling": 45739,
-    "min_stall_duration_sample": 10
+    "min_stall_duration_sample": 30
   }
 }

@@ -37,6 +37,12 @@ export interface Meta {
     ai_exposure?: {
       model_version: string; computed: string; adoption_preset: string;
       scenario_id: string; horizon: string; scored: number; note?: string | null;
+      // AI headcounts sit on a WIDER universe than every other figure here (stall and
+      // ACS both drop managers and classroom teachers), so the base travels with the
+      // vintage and the Source Data panel surfaces it rather than leaving it implicit.
+      employment_base?: string | null;
+      employment_total?: number | null;
+      employment_universe?: string | null;
     } | null;
   };
   geographies: { key: string; level: GeoLevel }[];
@@ -56,6 +62,10 @@ export interface Stats {
   stranded_rate_pct: number | null;
   oews_employment: number | null;
   has_workers: boolean;
+  /** False when the ACS has no sample for this cell — distinct from "no workers".
+   *  `total`/`low_wage`/`underemployed` are ACS-sourced and read 0 either way, but
+   *  `stalled` comes from Profiles/OEWS and can still be a real, measured count. */
+  has_acs: boolean;
 }
 
 export interface Demographics { age: Pair[]; education: Pair[] }
@@ -190,8 +200,17 @@ let _counties: any;             // TN county GeoJSON (map geometry, curated)
 let _skills: SkillsData | null = null;
 let _ready = false;
 
-async function getJson(file: string): Promise<any> {
-  const res = await fetch(url(file));
+// The JS bundle is content-hashed but these JSON assets are not, so without a
+// cache key a returning visitor can pair a fresh bundle with a browser- or
+// CDN-cached view store from a previous vintage — which renders as fields quietly
+// missing rather than as an error. meta.json is small and always fetched fresh;
+// its generated_at stamp then keys every other file. Keying off the data (not the
+// build) also covers a data-only sync, where the bundle hash never changes.
+let _dataVersion = '';
+
+async function getJson(file: string, fresh = false): Promise<any> {
+  const href = fresh ? url(file) : `${url(file)}?v=${encodeURIComponent(_dataVersion)}`;
+  const res = await fetch(href, fresh ? { cache: 'no-store' } : undefined);
   if (!res.ok) throw new Error(`Failed to load ${file}: ${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -199,8 +218,9 @@ async function getJson(file: string): Promise<any> {
 /** Fetch the startup payload once. Skills and (implicitly) nothing else follow lazily. */
 export async function initData(): Promise<void> {
   if (_ready) return;
-  const [meta, geo, paths, ref, counties] = await Promise.all([
-    getJson('meta.json'),
+  const meta = await getJson('meta.json', true);
+  _dataVersion = String(meta.generated_at ?? meta.pub_date ?? '');
+  const [geo, paths, ref, counties] = await Promise.all([
     getJson('geo_sector.json'),
     getJson('pathways.json'),
     getJson('reference.json'),
