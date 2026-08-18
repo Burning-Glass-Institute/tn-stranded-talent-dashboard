@@ -244,6 +244,26 @@ export const getCountyBoundaries = (): any => _counties;
 export const getSlice = (geo: string, sector: string): GeoSectorSlice | undefined =>
   _geoSector[`${geo}|${sector}`];
 
+/** Statewide all-stranded rate (the 3-term low-wage U underemployed + net-new-stalled
+ *  union that per-occupation `share_stranded` also measures), pooled over every sector
+ *  at geography "All". The view store emits no statewide row -- "All" exists only per
+ *  sector -- so it is aggregated once here and memoized. Summing the "All" rows is the
+ *  sanctioned aggregation: they are MSA-scope and partition the state by sector, unlike
+ *  the Region rows, which independently re-cover it (see build_web_views.R). */
+let _statewideStrandedRate: number | null | undefined;
+export const getStatewideStrandedRate = (): number | null => {
+  if (_statewideStrandedRate !== undefined) return _statewideStrandedRate;
+  let workers = 0;
+  let stranded = 0;
+  for (const [key, slice] of Object.entries(_geoSector)) {
+    if (!key.startsWith('All|') || !slice.stats.has_acs) continue;
+    workers += slice.stats.total ?? 0;
+    stranded += slice.stats.stranded_total ?? 0;
+  }
+  _statewideStrandedRate = workers > 0 ? stranded / workers : null;
+  return _statewideStrandedRate;
+};
+
 export const getPathways = (occ: string): OriginPathways | undefined => _pathways[occ];
 
 export const getOccRef = (name: string): OccRef | undefined => _reference.occupations[name];

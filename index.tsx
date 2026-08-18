@@ -27,7 +27,7 @@ import {
 import TennesseeMap from './src/components/TennesseeMap';
 import {
   initData, isReady, getMeta, getCountyBoundaries,
-  getSlice, getPathways, getOccRef, getOccSectorDemand, loadSkills,
+  getSlice, getPathways, getOccRef, getOccSectorDemand, getStatewideStrandedRate, loadSkills,
   tnLicenses, commonCredentials,
   type CohortType, type Destination, type SkillsData,
 } from './src/data';
@@ -221,6 +221,78 @@ function isCredentialRelevantToOccupation(skillName: string, destOccupation: str
 const isOnRamp = (p: { low_prep_addon?: number | string | boolean | null }): boolean => {
   const v = p.low_prep_addon;
   return v === true || v === 1 || (typeof v === 'string' && v.toUpperCase() === 'TRUE');
+};
+
+/** Destinations judged on their OWN level, not against the origin.
+ *  ------------------------------------------------------------------
+ *  The next-step gate in R/next_steps/tn_next_steps_enriched.R is purely RELATIVE: it
+ *  keeps a destination that is not significantly more stranded than the origin and pays
+ *  within tolerance of it. Applied to a badly stranded origin, that admits destinations
+ *  which are themselves heavily stranded in absolute terms — a real step up, but not an
+ *  exit from the stranded population. The pill below says so on the card.
+ *
+ *  The bar is a MULTIPLE of the statewide stranded rate, not the bare rate: half the
+ *  scored occupations sit above the state average, and a flag on half the cards carries
+ *  no signal. */
+const HIGH_STRAND_MULTIPLE = 1.5;
+
+interface DestinationFlags {
+  highStranded: boolean;
+  /** Outside the measured universe entirely — see strandUnmeasured() below. */
+  strandUnmeasured: boolean;
+  /** Destination stranded share, null once it is known to be unmeasured. */
+  strandShare: number | null;
+  /** The statewide rate the bar is a multiple of, and the bar itself. */
+  statewideRate: number | null;
+  highStrandLine: number | null;
+}
+
+/** Managers (SOC-11) and classroom teachers (SOC 251/252) are dropped from BOTH the ACS
+ *  and the career-stall frames, then coalesced to 0 — so their 0 means "not in the
+ *  universe", not "no stranded workers". reference.json carries no imputation flag, but
+ *  it nulls the cohort components for exactly those occupations, and that pair recovers
+ *  strand_imputed_destination on all 3,835 enriched destination rows. Without this the
+ *  30 affected destinations read as a strandedness improvement they never earned. */
+const strandUnmeasured = (name: string): boolean => {
+  const ref = getOccRef(name);
+  return !!ref && ref.share_stranded === 0 && ref.share_low_wage === null;
+};
+
+const destinationFlags = (p: Destination): DestinationFlags => {
+  const statewideRate = getStatewideStrandedRate();
+  const highStrandLine = statewideRate === null ? null : statewideRate * HIGH_STRAND_MULTIPLE;
+  const unmeasured = strandUnmeasured(p.name);
+  const strandShare = unmeasured ? null : p.share_stranded_destination;
+  return {
+    highStranded: strandShare !== null && highStrandLine !== null && strandShare >= highStrandLine,
+    strandUnmeasured: unmeasured,
+    strandShare,
+    statewideRate,
+    highStrandLine,
+  };
+};
+
+/** Caution pill for a destination that is itself heavily stranded. Rose, so it never
+ *  reads as one of the amber "on-ramp" or green "good news" chips. */
+const HighStrandednessPill: React.FC<{ dest: Destination; isSelected?: boolean }> = ({ dest, isSelected }) => {
+  const f = destinationFlags(dest);
+  if (!f.highStranded) return null;
+  return (
+    <div className="group relative -mt-1 mb-3">
+      <span className={`inline-block text-[8px] md:text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+        isSelected ? 'bg-rose-400/20 text-rose-200 border border-rose-300/30' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+        High strandedness
+      </span>
+      <div className="absolute bottom-full left-0 mb-1 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-60 z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
+        {f.strandShare != null ? `${(f.strandShare * 100).toFixed(0)}% of` : 'A share of'} Tennessee
+        workers in this occupation are low-wage, underemployed, or career-stalled — at least
+        {' '}{HIGH_STRAND_MULTIPLE}x the statewide rate
+        {f.statewideRate != null ? ` of ${(f.statewideRate * 100).toFixed(1)}%` : ''}.
+        Destinations are screened against the origin, not against the state, so a qualifying
+        move can still land in a heavily stranded occupation.
+      </div>
+    </div>
+  );
 };
 
 /** Wage gain is signed — the economic gate admits moves down to -5% of origin median,
@@ -671,6 +743,7 @@ const Dashboard = () => {
     const bandShort = (b: AIBand) => b === 'high' ? 'High Risk' : b === 'med' ? 'Soft Decline' : b === 'low' ? 'Stable' : '—';
 
     const topPathways = destinationPathways.slice(0, 5);
+    const statewideStrandedRate = getStatewideStrandedRate();
     const briefDate = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 
     const reportHtml = `<!doctype html><html><head><meta charset="utf-8"/><title>Executive Brief: Stranded Talent — ${esc(geoLabel)} · ${esc(sector)}</title>
@@ -795,18 +868,23 @@ const Dashboard = () => {
           const wg = p.wage_gain_median ?? 0;
           const wgp = p.wage_gain_median_pct ?? 0;
           const ds = p.diff_strandedness ?? 0;
+          const f = destinationFlags(p);
           return `<div class="rec-card">
             <h3>Destination ${String(i + 1).padStart(2, '0')}${p.similarity_rating ? ` · ${esc(p.similarity_rating.charAt(0).toUpperCase() + p.similarity_rating.slice(1))} similarity` : ''}</h3>
             <p class="rec-title">${esc(p.name)}</p>
             <div class="rec-row">
               <span><strong style="color: #fef3c7;">Wage gain:</strong> ${formatWageGain(wg)} (${formatWageGainPct(wgp * 100)})</span>
-              <span><strong style="color: #fef3c7;">Strandedness change:</strong> ${Math.round(ds * 100) > 0 ? '+' : ''}${Math.round(ds * 100)} pts</span>
+              <span><strong style="color: #fef3c7;">Strandedness change:</strong> ${f.strandUnmeasured ? 'not measured' : `${Math.round(ds * 100) > 0 ? '+' : ''}${Math.round(ds * 100)} pts (destination ${((f.strandShare ?? 0) * 100).toFixed(0)}%)`}</span>
               <span><strong style="color: #fef3c7;">TN demand:</strong> ${esc(p.demand_category || 'N/A')}</span>
               ${sDest.band !== 'none' && sDest.impactPct !== null ? `<span class="rec-pill" style="background: ${bandHex(sDest.band)}; color: white;">${bandShort(sDest.band)} · ${sDest.impactPct >= 0 ? '+' : ''}${sDest.impactPct.toFixed(0)}% 5yr</span>` : ''}
               ${(intP !== undefined && intP !== null) ? `<span class="rec-pill">Internal promo ${Math.round(intP * 100)}%</span>` : ''}
+              ${f.highStranded ? `<span class="rec-pill" style="background: #e11d48; color: white;">High strandedness</span>` : ''}
             </div>
           </div>`;
         }).join('')}
+        ${topPathways.some(p => destinationFlags(p).highStranded) ? `<p class="narrative" style="font-size: 10px; color: #64748b; margin-top: -4px;">
+          Destinations are screened for improvement <em>relative to the origin</em>, so a qualifying move can still land in an occupation that is heavily stranded in its own right. The red <strong>High strandedness</strong> pill marks those: the destination's own low-wage/underemployed/career-stalled share is at least ${HIGH_STRAND_MULTIPLE}x the statewide rate${statewideStrandedRate !== null ? ` of ${(statewideStrandedRate * 100).toFixed(1)}%` : ''}.
+        </p>` : ''}
 
         <h2 style="margin-top: 22px;">Strategic implications</h2>
         <ul class="recs-list">
@@ -1376,6 +1454,7 @@ const Dashboard = () => {
                     const wageGain = p.wage_gain_median ?? 0;
                     const wagePct = Math.round((p.wage_gain_median_pct ?? 0) * 100);
                     const strandPct = Math.round((p.diff_strandedness ?? 0) * 100);
+                    const flags = destinationFlags(p);
                     const isSelected = selectedDestination === p.name;
                     return (
                       <div key={i} onClick={() => setSelectedDestination(p.name)}
@@ -1399,6 +1478,7 @@ const Dashboard = () => {
                             </div>
                           </div>
                         )}
+                        <HighStrandednessPill dest={p} isSelected={isSelected} />
                         <div className="space-y-2">
                           <div className="flex items-center justify-between group relative">
                             <span className={`text-[8px] md:text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>
@@ -1413,11 +1493,20 @@ const Dashboard = () => {
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between group relative">
                             <span className={`text-[8px] md:text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>Strandedness</span>
-                            <span className={`text-[11px] md:text-xs font-black ${strandPct < 0 ? (isSelected ? 'text-emerald-300' : 'text-emerald-600') : strandPct === 0 ? (isSelected ? 'text-blue-200' : 'text-slate-500') : (isSelected ? 'text-red-300' : 'text-red-500')}`}>
-                              {strandPct === 0 ? '±0 pts' : strandPct < 0 ? `${strandPct} pts` : `+${strandPct} pts`}
-                            </span>
+                            {flags.strandUnmeasured ? (
+                              <span className={`text-[10px] font-bold ${isSelected ? 'text-blue-300' : 'text-slate-400'}`}>Not measured</span>
+                            ) : (
+                              <span className={`text-[11px] md:text-xs font-black ${strandPct < 0 ? (isSelected ? 'text-emerald-300' : 'text-emerald-600') : strandPct === 0 ? (isSelected ? 'text-blue-200' : 'text-slate-500') : (isSelected ? 'text-red-300' : 'text-red-500')}`}>
+                                {strandPct === 0 ? '±0 pts' : strandPct < 0 ? `${strandPct} pts` : `+${strandPct} pts`}
+                              </span>
+                            )}
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56 text-center z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
+                              {flags.strandUnmeasured
+                                ? 'This occupation sits outside the measured strandedness universe — managers and classroom teachers are excluded from both the ACS and career-stall frames — so no change against the origin can be shown.'
+                                : `Change in the share of workers who are low-wage, underemployed, or career-stalled, moving from the origin to this destination. Destination rate: ${((flags.strandShare ?? 0) * 100).toFixed(1)}%.`}
+                            </div>
                           </div>
                           {pathwayMode === 'transitions' && (p.per_1000_switches || 0) > 0 && (
                             <div className="flex items-center justify-between">
@@ -1795,6 +1884,8 @@ const Dashboard = () => {
                       ))}
                     </div>
 
+                    <HighStrandednessPill dest={selectedDestRow} isSelected />
+
                     <div className="space-y-6 md:space-y-10">
                       <div className="flex items-center gap-4 md:gap-8">
                         <div className="w-12 h-12 md:w-16 md:h-16 rounded-[20px] md:rounded-[24px] bg-white/5 flex items-center justify-center text-amber-400 shadow-inner flex-shrink-0">
@@ -1817,12 +1908,36 @@ const Dashboard = () => {
                         </div>
                         <div>
                           <p className="text-[10px] md:text-[11px] font-bold uppercase text-blue-300 tracking-widest mb-1 md:mb-2">Strandedness Change</p>
-                          <p className={`text-2xl md:text-3xl font-black ${(selectedDestRow.diff_strandedness ?? 0) < 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {Math.round((selectedDestRow.diff_strandedness ?? 0) * 100) > 0 ? '+' : ''}{Math.round((selectedDestRow.diff_strandedness ?? 0) * 100)}<span className="text-lg"> pts</span>
-                          </p>
-                          <p className="text-[10px] text-blue-300 mt-1">
-                            Destination stranded rate: {((selectedDestRow.share_stranded_destination ?? 0) * 100).toFixed(1)}%
-                          </p>
+                          {(() => {
+                            const f = destinationFlags(selectedDestRow);
+                            // Managers and classroom teachers leave the universe entirely, so the
+                            // headline pts figure is an artefact of coalescing their missing rate
+                            // to 0 — print the exclusion instead of a change nobody measured.
+                            if (f.strandUnmeasured) {
+                              return (
+                                <>
+                                  <p className="text-2xl md:text-3xl font-black text-blue-300">Not measured</p>
+                                  <p className="text-[10px] text-blue-300 mt-1">
+                                    Managers and classroom teachers are outside both the ACS and career-stall frames.
+                                  </p>
+                                </>
+                              );
+                            }
+                            const pts = Math.round((selectedDestRow.diff_strandedness ?? 0) * 100);
+                            return (
+                              <>
+                                <p className={`text-2xl md:text-3xl font-black ${(selectedDestRow.diff_strandedness ?? 0) < 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                  {pts > 0 ? '+' : ''}{pts}<span className="text-lg"> pts</span>
+                                </p>
+                                <p className="text-[10px] text-blue-300 mt-1">
+                                  Destination stranded rate: {((f.strandShare ?? 0) * 100).toFixed(1)}%
+                                  {f.highStranded && f.highStrandLine !== null
+                                    ? ` — above the ${(f.highStrandLine * 100).toFixed(0)}% high-strandedness mark`
+                                    : ''}
+                                </p>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                       <div className="flex items-center gap-4 md:gap-8">
