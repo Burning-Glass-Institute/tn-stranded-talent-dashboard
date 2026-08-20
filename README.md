@@ -29,11 +29,19 @@ The dashboard is a Vite + React app. `npm run build` runs a bundle guard
 (`scripts/check_bundle.mjs`) that fails if raw microdata column names or
 spreadsheets ever appear in the compiled JS.
 
+After a build, `npm run verify` drives a headless browser through every
+geography × sector × cohort view and fails on any render error — run it after
+every build or data refresh (one-time setup: `npx playwright install chromium`).
+
 ## Deployment
 
-Pushes to `main` build and publish to GitHub Pages via
+Pushes to `main` build, verify, and publish to GitHub Pages via
 `.github/workflows/deploy-pages.yml`. The project is served under the
 `/tn-stranded-talent-dashboard/` base path (set by `VITE_BASE` in the workflow).
+
+**[HOSTING.md](HOSTING.md)** is the full hosting guide: building from source,
+base-path configuration, verification, serving on any static host, and how data
+refreshes are delivered and applied.
 
 ## Provenance
 
