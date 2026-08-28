@@ -109,7 +109,7 @@ const TennesseeMap: React.FC<TennesseeMapProps> = ({ selectedRegion, onRegionCli
 
   // When a Grand Division is selected or hovered, county fill is decided per county
   // via the county-to-division crosswalk rather than per MSA group. That crosswalk
-  // mirrors input/tn_county_lwda_region_crosswalk.csv -- the WIOA-area grouping the
+  // mirrors BGI's county-to-LWDA-to-region crosswalk -- the WIOA-area grouping the
   // Region estimates are actually tabulated on, NOT the statutory divisions (they
   // differ on Cumberland and Sequatchie; see the note under the map).
   const selectedDivision = GRAND_DIVISIONS.includes(selectedRegion as GrandDivision) ? (selectedRegion as GrandDivision) : null;

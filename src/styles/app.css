@@ -1,0 +1,38 @@
+/**
+ * The app's only stylesheet. Imported by index.tsx, compiled by PostCSS, and
+ * emitted into dist/assets/ -- nothing here is fetched from an external host.
+ *
+ * Inter is self-hosted from @fontsource/inter. The weights below are exactly the
+ * five the old Google Fonts link requested (300;400;500;600;700). The design uses
+ * Tailwind's font-black (900), which the browser has always synthesized from 700;
+ * adding a real 800 or 900 face would render heavier than the published design.
+ * Add those weights only alongside a deliberate visual review.
+ */
+@import '@fontsource/inter/300.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+.region-path {
+  transition: fill 0.2s;
+  cursor: pointer;
+}
+
+.region-path:hover {
+  fill: #1d4ed8 !important;
+}
+
+.selected-region {
+  fill: #1e3a8a !important;
+  stroke: #fbbf24;
+  stroke-width: 2px;
+}

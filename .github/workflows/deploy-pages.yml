@@ -38,9 +38,6 @@ jobs:
         run: npm run build
         env:
           VITE_BASE: /tn-stranded-talent-dashboard/
-          # VITE_REPORT_DOCX intentionally unset -> the report download button is
-          # hidden. Set it to '1' (and commit the .docx into public/) only once the
-          # report is cleared for public release.
       - name: Install Playwright Chromium (for the render smoke test)
         run: npx playwright install --with-deps chromium
       - name: Verify (headless render smoke test across every view)

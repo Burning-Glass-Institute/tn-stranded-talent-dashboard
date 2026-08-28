@@ -5,8 +5,8 @@
  * Identifies "stranded workers" (low-wage, underemployed, career-stalled)
  * and provides career pathway analysis with skill gap and credential data.
  *
- * Data: the R pipeline (R/reports/build_web_views.R) precomputes exactly the
- * aggregates rendered here into output/reports/web/*.json; the prebuild step syncs
+ * Data: BGI's R pipeline precomputes exactly the
+ * aggregates rendered here into the view store; the prebuild step syncs
  * them to public/data/, and this app FETCHES them at runtime (see ./src/data). No
  * cell-level microdata is bundled or downloaded — the browser only ever sees the
  * view aggregates it renders, and output/ is the single source of truth.
@@ -17,6 +17,7 @@
  *   src/components/TennesseeMap.tsx — interactive D3 map of TN MSA regions
  */
 
+import './src/styles/app.css';
 import React, { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
@@ -48,7 +49,7 @@ const REGION_GEOS = new Set(['East', 'Middle', 'West']);
 
 /** Display label for the combined non-major-metro bucket. The data key stays 'Other MSA'
  *  (matches the pipeline + view store); only the on-screen label changes. Rural counties are
- *  folded into this bucket to match the PDL stall geography, which has no rural component, so
+ *  folded into this bucket to match the Career Histories stall geography, which has no rural component, so
  *  an "MSA" label would misleadingly imply rural is excluded. */
 const OTHER_MSA_LABEL = 'Other & Rural TN';
 const geoDisplay = (g: string) => (g === 'Other MSA' ? OTHER_MSA_LABEL : g);
@@ -225,7 +226,7 @@ const isOnRamp = (p: { low_prep_addon?: number | string | boolean | null }): boo
 
 /** Destinations judged on their OWN level, not against the origin.
  *  ------------------------------------------------------------------
- *  The next-step gate in R/next_steps/tn_next_steps_enriched.R is purely RELATIVE: it
+ *  The next-step gate in BGI's enrichment pipeline is purely RELATIVE: it
  *  keeps a destination that is not significantly more stranded than the origin and pays
  *  within tolerance of it. Applied to a badly stranded origin, that admits destinations
  *  which are themselves heavily stranded in absolute terms — a real step up, but not an
@@ -390,7 +391,7 @@ const DemandBadge: React.FC<{ occupation?: string | null; sector?: string; compa
 };
 
 /** AI displacement-risk model. Bands on impact_pct_baseline (BGI's demand-adjusted
- *  5-year projected change in employer demand). See R/next_steps/tn_ai_exposure.R. */
+ *  5-year projected change in employer demand). */
 type AIBand = 'high' | 'med' | 'low' | 'none';
 interface AIScore {
   auto: number | null;
@@ -421,7 +422,8 @@ const scoreAI = (auto?: number | null, aug?: number | null, impactPct?: number |
   // so the top band is named "Stable" (not "Stable / Growing") -- it spans -2% to +2% as
   // well as genuine growth, and a green label promising growth on a negative number reads
   // as a bug. High = ≤ −5% loss, Soft Decline = −5% to −2%, Stable = > −2%. Thresholds
-  // retained for abbe-v2.0 (employment-weighted High share ≈ 17.6%, matches the report).
+  // retained for the current model vintage (employment-weighted High share ≈ 17.6%,
+  // matching the published report).
   let band: AIBand;
   if (i <= -5) band = 'high';
   else if (i <= -2) band = 'med';
@@ -603,15 +605,13 @@ const Dashboard = () => {
    *  Both dimensions are ACS-only, and that is a weighting constraint rather than a
    *  gap in the data. The ACS carries survey weights that make it representative by age
    *  and education. Career Histories, which is where career stalls are measured, is not a
-   *  probability sample and skews on both; R/pdl_stall/01 rakes it to OEWS occupation x
+   *  probability sample and skews on both; the pipeline rakes it to OEWS occupation x
    *  QCEW industry x MSA margins only, so the stalled counts are representative on
    *  occupational mix and carry NO demographic margin. A stalled age/education profile
    *  appended here would move the bars toward Career Histories' own over-representation.
-   *  So build_web_views.R keys the "All Stranded" demographics to the ACS `stranded`
+   *  So the view builder keys the "All Stranded" demographics to the ACS `stranded`
    *  column (low_wage + underemployed), NOT lw + ue + stalled. Verified across all
    *  171 slices: both panels sum to exactly stats.lw + stats.ue.
-   *  Written up in documentation/consolidated_methodology.md S6 and in
-   *  documentation/dashboard_handover_technical.md (under question 3).
    *
    *  Consequence the panels must state: under "All Stranded" these two charts fall
    *  short of the headline beside them by precisely the stalled count. */
@@ -1026,16 +1026,34 @@ const Dashboard = () => {
           </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
-          {/* Report download is gated on VITE_REPORT_DOCX (built into the public site only once the
-              .docx is cleared for public release + committed alongside it). Hidden by default. */}
-          {(import.meta as any).env?.VITE_REPORT_DOCX === '1' && (
+          {/* ----------------------------------------------------------------
+              OPTIONAL: "Download Full Report" button.
+
+              This delivery ships WITHOUT the report download. The report .docx is
+              not included in the package, and the button that linked to it is
+              commented out below rather than deleted, so it can be restored later
+              without redesigning the header.
+
+              To enable it:
+                1. Obtain the report file from BGI and place it at
+                   public/Mobilizing-Stranded-Talent-Report.docx. The filename must
+                   match the href below exactly (it is case-sensitive on most hosts).
+                2. Uncomment the <a> element below.
+                3. Rebuild and redeploy: npm run build && npm run verify.
+
+              The button sits to the left of "Export Executive Brief" and inherits
+              the same responsive sizing, so no other change is needed. If the file
+              is absent the link will 404 rather than fail the build -- step 1 is
+              not optional.
+              ---------------------------------------------------------------- */}
+          {/*
           <a href={`${BASE_URL}Mobilizing-Stranded-Talent-Report.docx`} download
             className="flex items-center gap-2 md:gap-3 bg-amber-500 hover:bg-amber-400 text-blue-950 px-4 py-2 md:px-6 md:py-3 rounded-2xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 group flex-1 md:flex-none justify-center"
             title="Download the full 'Mobilizing Stranded Talent' research report (Word document)">
             <FileText size={16} className="md:w-[18px] md:h-[18px] group-hover:translate-y-0.5 transition-transform" />
             <span className="hidden sm:inline">Download Full Report</span><span className="sm:hidden">Full Report</span>
           </a>
-          )}
+          */}
           <button onClick={handleExportBrief}
             className="flex items-center gap-2 md:gap-3 bg-white hover:bg-slate-100 text-blue-950 px-4 py-2 md:px-6 md:py-3 rounded-2xl font-black text-xs uppercase transition-all shadow-xl active:scale-95 group flex-1 md:flex-none justify-center">
             <Download size={16} className="md:w-[18px] md:h-[18px] group-hover:translate-y-0.5 transition-transform" />
@@ -1236,7 +1254,7 @@ const Dashboard = () => {
                   <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
                     <TrendingUp size={14} className="text-emerald-700"/> Stall Duration
                     {/* Only the SHAPE is borrowed; bar heights are always this slice's own
-                        stalled count. See the ladder in R/reports/build_web_views.R. */}
+                        stalled count, allocated so the bars sum exactly to the headline. */}
                     {stalledBreakdowns.durationBasis === 'sector' && (
                       <span className="ml-auto normal-case tracking-normal font-bold text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                         {sector} pattern statewide
@@ -1378,9 +1396,9 @@ const Dashboard = () => {
                 {demoBreakdowns.acsOnly && (
                   <div className="md:col-span-2 lg:col-span-3">
                     {/* Kept to three sentences on purpose. The full weighting argument
-                        lives in documentation/consolidated_methodology.md S6 and in the
-                        handover doc; the panel needs only the fact, the cause, and the
-                        arithmetic that reconciles it to the headline. */}
+                        lives in BGI's methodology documentation; the panel needs only the
+                        fact, the cause, and the arithmetic that reconciles it to the
+                        headline. */}
                     <p className="text-[11px] leading-relaxed text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
                       <span className="font-black text-slate-600">Age and education cover the
                       low-wage and underemployed cohorts only:</span>{' '}
@@ -2186,12 +2204,12 @@ const Dashboard = () => {
                     (scripts/check_bundle.mjs) forbids compiling into the app. */}
                 <p>
                   Résumé histories calibrated to OEWS employment by occupation, industry and
-                  geography{meta.vintages.pdl_stall.run_date ? ` — run ${meta.vintages.pdl_stall.run_date}` : ''}
-                  {meta.vintages.pdl_stall.headline_stall_rate_pct !== null
-                    ? <>; statewide career-stall rate {meta.vintages.pdl_stall.headline_stall_rate_pct}%.</>
+                  geography{meta.vintages.career_stall.run_date ? ` — run ${meta.vintages.career_stall.run_date}` : ''}
+                  {meta.vintages.career_stall.headline_stall_rate_pct !== null
+                    ? <>; statewide career-stall rate {meta.vintages.career_stall.headline_stall_rate_pct}%.</>
                     : '.'}
                 </p>
-                <p className="mt-1 text-slate-400">{meta.vintages.pdl_stall.excluded_occupations}</p>
+                <p className="mt-1 text-slate-400">{meta.vintages.career_stall.excluded_occupations}</p>
               </div>
 
               <div>

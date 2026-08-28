@@ -43,7 +43,7 @@ function die(msg) {
 }
 
 if (!existsSync(webDir)) {
-  die(`view store not found at ${webDir}. Run Rscript R/reports/build_web_views.R first.`);
+  die(`view store not found at ${webDir}. Regenerate it with the view-store build, or restore the committed viewstore/ snapshot.`);
 }
 if (!existsSync(curatedCounties)) {
   die(`curated county GeoJSON not found at ${curatedCounties}.`);
@@ -94,7 +94,7 @@ if (existsSync(nsDir)) {
     const nsNewest = Math.max(...nsFiles.map(f => statSync(join(nsDir, f)).mtimeMs));
     if (nsNewest > webNewest) {
       console.warn('[sync_web_data] WARNING: output/next_steps has files newer than the view store — '
-        + 're-run R/reports/build_web_views.R to pick them up.');
+        + 're-run the view-store build to pick them up.');
     }
   }
 }

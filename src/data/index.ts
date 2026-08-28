@@ -1,12 +1,12 @@
 /**
  * View-store data layer.
  * ======================
- * The R pipeline (R/reports/build_web_views.R) precomputes exactly the aggregates
- * the dashboard renders and writes them to output/reports/web/*.json. The prebuild
- * step (scripts/sync_web_data.mjs) copies those into public/data/, where they are
- * served as static assets and fetched at runtime. No cell-level microdata is ever
- * bundled into or downloaded by the browser, and output/ is the single source of
- * truth — the app cannot silently diverge from the pipeline.
+ * BGI's R pipeline precomputes exactly the aggregates the dashboard renders and
+ * writes them to the view store. The prebuild step (scripts/sync_web_data.mjs)
+ * copies those into public/data/, where they are served as static assets and
+ * fetched at runtime. No cell-level microdata is ever bundled into or downloaded
+ * by the browser, and the view store is the single source of truth — the app
+ * cannot silently diverge from the pipeline.
  *
  * Everything except skills.json is fetched once at startup (initData); skills.json
  * (the largest payload) is fetched lazily on first use (loadSkills), keeping it out
@@ -15,7 +15,7 @@
  */
 
 // ============================================================================
-// TYPES (mirror the shapes emitted by R/reports/build_web_views.R)
+// TYPES (mirror the shapes emitted by the view-store builder)
 // ============================================================================
 
 export type GeoLevel = 'State' | 'MSA' | 'Region';
@@ -26,7 +26,7 @@ export interface Meta {
   generated_at: string;
   pub_date: string;
   vintages: {
-    pdl_stall: {
+    career_stall: {
       run_date: string | null;
       headline_stall_rate_pct: number | null;
       oews_calibrated_employment: number | null;
@@ -76,7 +76,7 @@ export interface GeoSectorSlice {
   stats: Stats;
   stalled: {
     durations: Pair[];
-    /** Which rung of the shape ladder the histogram rests on (build_web_views.R). */
+    /** Which rung of the shape ladder the histogram rests on. */
     duration_basis: 'cell' | 'sector' | 'statewide' | 'none';
     duration_suppressed: boolean;
     /** Completed spells behind the shape actually used (the pooled count when borrowed). */
@@ -108,7 +108,7 @@ export interface Destination {
   wage_gain_median: number | null;
   wage_gain_median_pct: number | null;
   /** Either side's TN median wage came from the OEWS fallback ladder, not a direct
-   *  Tennessee observation. See build_acs_wages() in R/shared/00_utils.R. */
+   *  Tennessee observation. */
   wage_imputed: boolean | null;
   share_stranded_origin: number | null;
   share_stranded_destination: number | null;
@@ -250,7 +250,7 @@ export const getSlice = (geo: string, sector: string): GeoSectorSlice | undefine
  *  at geography "All". The view store emits no statewide row -- "All" exists only per
  *  sector -- so it is aggregated once here and memoized. Summing the "All" rows is the
  *  sanctioned aggregation: they are MSA-scope and partition the state by sector, unlike
- *  the Region rows, which independently re-cover it (see build_web_views.R). */
+ *  the Region rows, which independently re-cover it. */
 let _statewideStrandedRate: number | null | undefined;
 export const getStatewideStrandedRate = (): number | null => {
   if (_statewideStrandedRate !== undefined) return _statewideStrandedRate;

@@ -3,7 +3,7 @@
  * ===========================
  * Drives the built dashboard in Chromium across every geography × sector (× cohort)
  * and asserts nothing throws and no "undefined"/"NaN"/"[object Object]" reaches the
- * DOM. Zero-worker slices and the Region (tn_only) geographies are exactly where a
+ * DOM. Zero-worker slices and the Region (TN-resident-scope) geographies are exactly where a
  * lookup rewrite tends to break, so they are all covered. Also exercises the
  * Section-04 path (occupation → destination → lazy-loaded skills → strategy panels).
  *

@@ -43,6 +43,11 @@ Pushes to `main` build, verify, and publish to GitHub Pages via
 base-path configuration, verification, serving on any static host, and how data
 refreshes are delivered and applied.
 
+The built site loads nothing from an external host — Tailwind CSS and the Inter
+typeface are compiled into `dist/assets/` at build time — so it runs unchanged on
+an isolated network. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the
+font license notice.
+
 ## Provenance
 
 This repository is a published mirror. Its contents are exported from the
