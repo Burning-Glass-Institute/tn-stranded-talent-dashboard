@@ -64,7 +64,8 @@ export interface Stats {
   has_workers: boolean;
   /** False when the ACS has no sample for this cell — distinct from "no workers".
    *  `total`/`low_wage`/`underemployed` are ACS-sourced and read 0 either way, but
-   *  `stalled` comes from Profiles/OEWS and can still be a real, measured count. */
+   *  `stalled` comes from BGI's Career Histories Dataset / OEWS and can still be a
+   *  real, measured count. */
   has_acs: boolean;
 }
 

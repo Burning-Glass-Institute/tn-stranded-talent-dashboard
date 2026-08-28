@@ -22,7 +22,7 @@ import { createRoot } from 'react-dom/client';
 import {
   MapPin, Briefcase, Target, Download, Users, GraduationCap,
   ArrowRight, ChevronDown, LayoutDashboard, BarChart3, Layers,
-  FileText, TrendingUp, Flame, Activity
+  FileText, TrendingUp, Flame, Activity, Info
 } from 'lucide-react';
 import TennesseeMap from './src/components/TennesseeMap';
 import {
@@ -346,6 +346,20 @@ const ProgressBar: React.FC<{ label: string; value: number; max: number; colorCl
   </div>
 );
 
+/** Hover tooltip anchored to a panel heading or stat tile.
+ *  Several panels here mix two different denominators -- a COUNT of stranded workers
+ *  per occupation versus the SHARE of an occupation's workers who are stranded -- and
+ *  a reviewer read the first as the second. The distinction has to be stated where the
+ *  number is, not in a footnote. */
+const InfoTip: React.FC<{ children: React.ReactNode; width?: string; align?: 'center' | 'left' }> = ({ children, width = 'w-64', align = 'center' }) => (
+  <span className="group relative inline-flex items-center align-middle">
+    <Info size={12} className="text-slate-300 group-hover:text-slate-500 cursor-help" />
+    <span className={`invisible group-hover:visible absolute z-50 ${width} p-3 bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-700 bottom-full mb-2 ${align === 'center' ? 'left-1/2 -translate-x-1/2' : 'left-0'} text-[11px] leading-relaxed normal-case tracking-normal font-normal`}>
+      {children}
+    </span>
+  </span>
+);
+
 /** Demand badge component for pathway cards (reads the fetched reference store). */
 const DemandBadge: React.FC<{ occupation?: string | null; sector?: string; compact?: boolean; isSelected?: boolean }> = ({ occupation, sector, compact, isSelected }) => {
   if (!occupation) return null;
@@ -561,7 +575,8 @@ const Dashboard = () => {
     lw: Math.round(slice?.stats.low_wage ?? 0),
     ue: Math.round(slice?.stats.underemployed ?? 0),
     st: Math.round(slice?.stats.stalled ?? 0),
-    // total/lw/ue are ACS; st is Profiles/OEWS. Where the ACS has no sample for a
+    // total/lw/ue are ACS; st is BGI's Career Histories Dataset / OEWS. Where the ACS
+    // has no sample for a
     // cell the first three read 0 while st stays a real measured count, so an
     // ACS-only denominator must not be read as "this selection is empty".
     hasAcs: slice?.stats.has_acs ?? (slice?.stats.total ?? 0) > 0,
@@ -583,14 +598,44 @@ const Dashboard = () => {
     stalledCount: slice?.stats?.stalled ?? 0,
   }), [slice]);
 
-  /** Age + education breakdowns for the selected cohort (already ordered & resolved). */
+  /** Age + education breakdowns for the selected cohort (already ordered & resolved).
+   *
+   *  Both dimensions are ACS-only, and that is a weighting constraint rather than a
+   *  gap in the data. The ACS carries survey weights that make it representative by age
+   *  and education. Career Histories, which is where career stalls are measured, is not a
+   *  probability sample and skews on both; R/pdl_stall/01 rakes it to OEWS occupation x
+   *  QCEW industry x MSA margins only, so the stalled counts are representative on
+   *  occupational mix and carry NO demographic margin. A stalled age/education profile
+   *  appended here would move the bars toward Career Histories' own over-representation.
+   *  So build_web_views.R keys the "All Stranded" demographics to the ACS `stranded`
+   *  column (low_wage + underemployed), NOT lw + ue + stalled. Verified across all
+   *  171 slices: both panels sum to exactly stats.lw + stats.ue.
+   *  Written up in documentation/consolidated_methodology.md S6 and in
+   *  documentation/dashboard_handover_technical.md (under question 3).
+   *
+   *  Consequence the panels must state: under "All Stranded" these two charts fall
+   *  short of the headline beside them by precisely the stalled count. */
   const demoBreakdowns = useMemo(() => {
     const demo = slice?.cohorts?.[selectedCohort]?.demographics;
     return {
       age: (demo?.age ?? []) as [string, number][],
       education: (demo?.education ?? []) as [string, number][],
+      // Only "All Stranded" names a wider population than these panels cover; the
+      // Low Wage and Underemployed tabs select an ACS cohort in full.
+      acsOnly: selectedCohort === 'All Stranded' && stats.st > 0,
+      acsCovered: stats.lw + stats.ue,
     };
-  }, [slice, selectedCohort]);
+  }, [slice, selectedCohort, stats]);
+
+  // The cohort tabs are a filter on everything below them, but they sit at the top of
+  // Section 02 and scroll out of view. Changing geography or sector with "Career
+  // Stalled" still active silently re-scoped Sections 02-04 to a cohort the reader
+  // could no longer see selected -- and the age/education panels then read as a
+  // different population than the header implied. Snap back to the default on every
+  // filter change so what is on screen always matches the tab the reader last set.
+  useEffect(() => {
+    setSelectedCohort('All Stranded');
+  }, [geography, sector]);
 
   // Auto-select the top occupation when filters change; clear when the slice is empty.
   useEffect(() => {
@@ -701,7 +746,7 @@ const Dashboard = () => {
     const maxOcc = Math.max(...cohortBreakdowns.occ.map(x => x[1]), 1);
     const totalStranded = stats.lw + stats.ue + stats.st;
     // Same three-state rate logic as the dashboard: no ACS sample (or an ACS sample
-    // thinner than the Profiles-measured stalled count) means there is no valid
+    // thinner than the Career-Histories-measured stalled count) means there is no valid
     // denominator — the brief must not print "0 workers / 0%" beside real counts.
     const briefRateKnown = stats.hasAcs && stats.total > 0 && totalStranded <= stats.total;
     const strandedPct = briefRateKnown ? (totalStranded / stats.total) * 100 : null;
@@ -719,6 +764,20 @@ const Dashboard = () => {
     const eduBuckets = (demo?.education ?? []) as [string, number][];
     const maxAge = Math.max(...ageBuckets.map(([, v]) => v), 1);
     const maxEdu = Math.max(...eduBuckets.map(([, v]) => v), 1);
+
+    // Age and education are ACS-only; the stranded headline is not. Under "All
+    // Stranded" the two charts fall short of it by exactly the stalled count, so the
+    // brief has to say what the gap is -- same wording as the on-screen panel.
+    const demoCaveat = (selectedCohort === 'All Stranded' && stats.st > 0 && (ageBuckets.length > 0 || eduBuckets.length > 0))
+      ? `<p style="font-size: 10px; line-height: 1.6; color: #64748b; margin-top: 16px;">
+          <strong>Age and education cover the low-wage and underemployed cohorts only:</strong>
+          ${(stats.lw + stats.ue).toLocaleString()} of the
+          ${totalStranded.toLocaleString()} stranded workers in this selection. The other
+          ${stats.st.toLocaleString()} are career-stalled, which is measured from BGI's Career
+          Histories Dataset rather than the ACS, and those records cannot be weighted to be
+          representative by age or education.
+        </p>`
+      : '';
 
     // Displacement risk table: top occupations of the SELECTED cohort (display only).
     const topOccs = cohortBreakdowns.occ.slice(0, 6);
@@ -812,6 +871,11 @@ const Dashboard = () => {
           <div>
             <p class="panel-h">Top occupational concentrations</p>
             ${cohortBreakdowns.occ.slice(0, 10).map(([l, v]) => renderReportBar(l, v, maxOcc, '#1e3a8a')).join('')}
+            <p style="font-size: 10px; line-height: 1.6; color: #64748b; margin-top: 12px;">
+              Ranked by the number of workers, so the largest occupations lead. This is each
+              occupation's share of the stranded population, not the share of that occupation's
+              own workers who are stranded.
+            </p>
           </div>
           <div>
             ${ageBuckets.length > 0 ? `
@@ -822,6 +886,7 @@ const Dashboard = () => {
               <p class="panel-h" style="margin-top: 22px;">Education attainment</p>
               ${eduBuckets.map(([l, v]) => renderReportBar(l, v, maxEdu, '#f59e0b')).join('')}
             ` : ''}
+            ${demoCaveat}
           </div>
         </div>
 
@@ -919,7 +984,7 @@ const Dashboard = () => {
   // the stalled leg alone claims 100% of a total it does not actually own, so the
   // whole mix falls back to a dash rather than three misleading percentages.
   const cohortMixKnown = stats.hasAcs && treemapTotal > 0;
-  // The rate mixes sources: lw/ue/total are ACS, st is Profiles/OEWS. Where the ACS
+  // The rate mixes sources: lw/ue/total are ACS, st is Career Histories/OEWS. Where the ACS
   // badly under-covers a sector the ratio can exceed 100% — meaningless, so treat it
   // like the no-sample case rather than printing an impossible percentage.
   const rateKnown = stats.total > 0 && treemapTotal <= stats.total;
@@ -1112,7 +1177,7 @@ const Dashboard = () => {
                   the caption must say which. The workforce share is the right stat. */}
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Cohort share of all stranded</p>
               {/* Three states, not two: a rate, an unmeasurable rate (ACS sample
-                  missing or too thin to serve as denominator, though Profiles still
+                  missing or too thin to serve as denominator, though Career Histories still
                   counts stalled workers here), and a genuinely empty selection. */}
               <p className="text-[10px] font-black text-slate-600">
                 {stranded_rate !== null
@@ -1128,7 +1193,7 @@ const Dashboard = () => {
           <div className="bg-white p-6 md:p-10 rounded-[24px] md:rounded-[40px] shadow-sm border border-slate-200">
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-5 md:mb-6">Diagnostics: {cohortDisplay(selectedCohort)}</h4>
 
-            {/* The stalled counts below are real (Profiles records projected onto OEWS
+            {/* The stalled counts below are real (Career Histories records projected onto OEWS
                 employment); it is the ACS survey denominator that is missing, which is
                 why the low-wage and underemployed cohorts read zero and no rate or age
                 / education breakdown can be shown. */}
@@ -1136,8 +1201,8 @@ const Dashboard = () => {
               <p className="-mt-3 mb-6 text-[11px] leading-relaxed text-slate-500 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                 No ACS survey sample falls in {geography === 'All' ? 'this selection' : `${geoDisplay(geography)} / ${sector}`},
                 so low-wage and underemployed counts, the stranded rate, and the age and education
-                breakdowns are unavailable here. The career-stalled figures come from Profiles
-                records calibrated to OEWS employment and are measured independently.
+                breakdowns are unavailable here. The career-stalled figures come from BGI&rsquo;s
+                Career Histories Dataset, calibrated to OEWS employment and measured independently.
               </p>
             )}
 
@@ -1240,6 +1305,15 @@ const Dashboard = () => {
                 <div>
                   <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
                     <Briefcase size={14} className="text-blue-500" /> Occupational Distribution
+                    <InfoTip>
+                      Occupations ranked by the <strong>number</strong> of{' '}
+                      {selectedCohort === 'All Stranded' ? 'stranded' : cohortDisplay(selectedCohort).toLowerCase()}{' '}
+                      workers in this selection, so Tennessee&rsquo;s largest occupations lead the list.
+                      That is a different measure from the <strong>share</strong> of an occupation&rsquo;s
+                      own workers who are stranded: a big occupation with an ordinary stranded rate can
+                      outrank a small one where most workers are stranded. Select an occupation in
+                      Section 03 and read <em>Stranded Share</em> for the second measure.
+                    </InfoTip>
                   </p>
                   <div className="space-y-3">
                     {cohortBreakdowns.occ.length > 0
@@ -1261,6 +1335,11 @@ const Dashboard = () => {
                 <div>
                   <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
                     <Users size={14} className="text-emerald-500" /> Age Distribution
+                    {demoBreakdowns.acsOnly && (
+                      <span className="ml-auto normal-case tracking-normal font-bold text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
+                        Excl. career stalled
+                      </span>
+                    )}
                   </p>
                   <div className="space-y-3">
                     {demoBreakdowns.age.length > 0 && demoBreakdowns.age.some(([, v]) => v > 0)
@@ -1276,6 +1355,11 @@ const Dashboard = () => {
                 <div className="md:col-span-2 lg:col-span-1">
                   <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4">
                     <GraduationCap size={14} className="text-amber-500" /> Education Attainment
+                    {demoBreakdowns.acsOnly && (
+                      <span className="ml-auto normal-case tracking-normal font-bold text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
+                        Excl. career stalled
+                      </span>
+                    )}
                   </p>
                   <div className="space-y-3">
                     {demoBreakdowns.education.length > 0 && demoBreakdowns.education.some(([, v]) => v > 0)
@@ -1288,6 +1372,27 @@ const Dashboard = () => {
                       : <p className="text-xs text-slate-400 italic">No education data for this slice.</p>}
                   </div>
                 </div>
+                {/* The reviewer added up the education bars, got less than the headline,
+                    and asked what the missing 20% was. It is the career-stalled cohort,
+                    exactly -- see the demoBreakdowns comment. Say so on the panel. */}
+                {demoBreakdowns.acsOnly && (
+                  <div className="md:col-span-2 lg:col-span-3">
+                    {/* Kept to three sentences on purpose. The full weighting argument
+                        lives in documentation/consolidated_methodology.md S6 and in the
+                        handover doc; the panel needs only the fact, the cause, and the
+                        arithmetic that reconciles it to the headline. */}
+                    <p className="text-[11px] leading-relaxed text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                      <span className="font-black text-slate-600">Age and education cover the
+                      low-wage and underemployed cohorts only:</span>{' '}
+                      {Math.round(demoBreakdowns.acsCovered).toLocaleString()} of the{' '}
+                      {Math.round(treemapTotal).toLocaleString()} stranded workers here. The
+                      other {Math.round(stats.st).toLocaleString()} are career-stalled, which is
+                      measured from BGI&rsquo;s Career Histories Dataset rather than the ACS, and those
+                      records cannot be weighted to be representative by age or education. The
+                      occupational distribution beside them <em>does</em> include them.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1312,6 +1417,22 @@ const Dashboard = () => {
                 <p className="text-xs text-slate-400 mt-2 max-w-md mx-auto">No {cohortDisplay(selectedCohort).toLowerCase()} workers are recorded for <span className="font-bold text-slate-600">{geography === 'All' ? 'Tennessee' : geoDisplay(geography)}</span> · <span className="font-bold text-slate-600">{sector}</span>. Pick a different cohort, geography, or sector to continue.</p>
               </div>
             ) : (
+              <>
+              {/* Two measures get confused here, with opposite denominators: the ranking
+                  is "this occupation's share of the stranded", the Stranded Share tile
+                  below is "the stranded share within this occupation". A large occupation
+                  at an average rate tops the ranking without being unusually stranded --
+                  which is why a pathway destination can appear on this list and still be
+                  a genuine step up. The high-strandedness pills use the tile, not this. */}
+              <p className="mb-5 md:mb-6 text-[11px] leading-relaxed text-slate-500">
+                Ranked by the <span className="font-black text-slate-600">number</span> of{' '}
+                {selectedCohort === 'All Stranded' ? 'stranded' : cohortDisplay(selectedCohort).toLowerCase()}{' '}
+                workers, so Tennessee&rsquo;s largest occupations lead. A place on this list is
+                not a finding that the occupation is unusually stranded &mdash; for that, select
+                one and read <span className="font-black text-slate-600">Stranded Share</span>,
+                which measures the share of that occupation&rsquo;s <em>own</em> workers who are
+                stranded.
+              </p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6">
                 {cohortBreakdowns.occ.slice(0, 10).map(([occ, val]) => (
                   <div key={occ} onClick={() => setTargetOccupation(occ)}
@@ -1330,6 +1451,7 @@ const Dashboard = () => {
                   </div>
                 ))}
               </div>
+              </>
             )}
 
             {/* Occupation Diagnostic Panel */}
@@ -1339,10 +1461,18 @@ const Dashboard = () => {
                   <Target size={14} className="text-blue-500" /> Occupation Diagnostics: {targetOccupation}
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
-                  <div className="p-4 md:p-6 bg-slate-50 rounded-[20px] md:rounded-[24px] border border-slate-100">
+                  <div className="p-4 md:p-6 bg-slate-50 rounded-[20px] md:rounded-[24px] border border-slate-100 group relative">
                     <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Stranded Share</p>
                     <p className="text-xl md:text-2xl font-black text-blue-900">{occupationDiagnostics.strandedShare !== null ? `${(occupationDiagnostics.strandedShare * 100).toFixed(1)}%` : '—'}</p>
                     <p className="text-[9px] text-slate-400 mt-1">of workers in this occupation are stranded</p>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-800 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-64 z-50 shadow-lg leading-relaxed normal-case font-normal tracking-normal">
+                      Statewide share of everyone working in this occupation who is low-wage,
+                      underemployed, or career-stalled. Note the denominator: the cards above
+                      count stranded workers per occupation, so the biggest occupations lead
+                      regardless of their rate, while this measures how concentrated
+                      strandedness is <em>within</em> the occupation. The high-strandedness
+                      flags on pathway destinations use this figure, not the ranking.
+                    </div>
                   </div>
                   <div className="p-4 md:p-6 bg-slate-50 rounded-[20px] md:rounded-[24px] border border-slate-100">
                     <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Median Wage</p>
@@ -2050,7 +2180,7 @@ const Dashboard = () => {
 
             <div className="px-8 py-6 space-y-6 text-[12px] leading-relaxed text-slate-600 normal-case tracking-normal font-normal text-left">
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Career-stalled workers — Profiles Data</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Career-stalled workers — BGI's Career Histories Dataset</p>
                 {/* The calibrated-employment base is deliberately not printed here:
                     its meta key collides with a microdata column name the bundle guard
                     (scripts/check_bundle.mjs) forbids compiling into the app. */}
